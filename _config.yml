@@ -4,7 +4,7 @@
 # Site Settings
 title: "Articles"
 description: "Tech articles and notes for collaboration"
-author: "Your Name"
+author: "laconicman"
 
 # GitHub Pages / Jekyll Settings
 theme: minima
@@ -72,7 +72,7 @@ minima:
     # twitter: yourhandle
 
 # SEO Settings
-lang: ru
+# Note: lang is set per-page via Polyglot; site-level lang omitted
 
 # Polyglot Multilingual Configuration
 # https://github.com/kurtsson/jekyll-polyglot
