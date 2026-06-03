@@ -36,10 +36,12 @@ plugins:
   - jekyll-seo-tag
 
 # Collections (for future bilingual support)
+# Note: Don't redefine 'posts' - it's built into Jekyll
 collections:
-  posts:
-    output: true
-    permalink: /:collection/:path/
+  # Add custom collections here if needed, e.g.:
+  # en:
+  #   output: true
+  #   permalink: /en/:path/
 
 # Default Front Matter
 defaults:
