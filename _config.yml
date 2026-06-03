@@ -4,9 +4,7 @@
 # Site Settings
 title: "Articles"
 description: "Tech articles and notes for collaboration"
-author:
-  name: "Your Name"
-  email: "your.email@example.com"
+author: "Your Name"
 
 # GitHub Pages / Jekyll Settings
 theme: minima
@@ -35,14 +33,6 @@ plugins:
   - jekyll-sitemap
   - jekyll-seo-tag
 
-# Collections (for future bilingual support)
-# Note: Don't redefine 'posts' - it's built into Jekyll
-collections:
-  # Add custom collections here if needed, e.g.:
-  # en:
-  #   output: true
-  #   permalink: /en/:path/
-
 # Default Front Matter
 defaults:
   - scope:
@@ -50,7 +40,6 @@ defaults:
       type: "posts"
     values:
       layout: post
-      author: "Your Name"
   - scope:
       path: ""
       type: "pages"
