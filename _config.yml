@@ -1,0 +1,83 @@
+# Jekyll Configuration for GitHub Pages
+# https://jekyllrb.com/docs/configuration/
+
+# Site Settings
+title: "Articles"
+description: "Tech articles and notes for collaboration"
+author:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+# GitHub Pages / Jekyll Settings
+theme: minima
+
+# URL Settings
+# For GitHub Project Pages: https://username.github.io/repo-name
+# baseurl will be your repository name
+baseurl: "/articles"  # Change this to your repo name
+url: ""  # Leave empty for GitHub Pages to auto-detect
+
+# Build Settings
+markdown: kramdown
+highlighter: rouge
+permalink: /:year/:month/:day/:title/
+
+# Timezone
+timezone: UTC
+
+# Pagination (Minima theme handles this, but you can customize)
+# paginate: 5
+# paginate_path: "/page:num/"
+
+# Plugins (GitHub Pages supported only)
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Collections (for future bilingual support)
+collections:
+  posts:
+    output: true
+    permalink: /:collection/:path/
+
+# Default Front Matter
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: post
+      author: "Your Name"
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: page
+
+# Exclude from processing
+exclude:
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
+  - Gemfile
+  - Gemfile.lock
+  - node_modules/
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+  - README.md
+  - LICENSE
+
+# Minima Theme Customizations
+minima:
+  skin: auto  # Options: auto, classic, dark, solarized, solarized-dark
+  date_format: "%b %-d, %Y"
+  social_links:
+    # Add your social links here
+    # github: yourusername
+    # twitter: yourhandle
+
+# SEO Settings
+lang: en
