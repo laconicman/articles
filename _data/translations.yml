@@ -1,0 +1,9 @@
+ru:
+  language: "Язык"
+  read_more: "Читать далее"
+  translation_available: "Доступен перевод"
+
+en:
+  language: "Language"
+  read_more: "Read more"
+  translation_available: "Translation available"

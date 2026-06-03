@@ -1,0 +1,16 @@
+{% if site.languages.size > 1 %}
+<div class="lang-switcher">
+  <span class="lang-label">{{ site.data.translations[page.lang].language | default: "Language" }}:</span>
+  {% for lang in site.languages %}
+    {% if lang == page.lang %}
+      <span class="lang-current">{{ lang | upcase }}</span>
+    {% else %}
+      {% assign lang_page = site.posts | where: "lang", lang | where: "date", page.date | first %}
+      {% if lang_page %}
+        <a href="{{ lang_page.url | relative_url }}" class="lang-link">{{ lang | upcase }}</a>
+      {% endif %}
+    {% endif %}
+    {% unless forloop.last %}<span class="lang-separator">|</span>{% endunless %}
+  {% endfor %}
+</div>
+{% endif %}

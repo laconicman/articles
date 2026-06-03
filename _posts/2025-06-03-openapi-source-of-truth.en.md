@@ -1,15 +1,18 @@
 ---
 layout: post
-title: "Wiki врёт, прод молчит — почему пора сделать OpenAPI единственным источником правды о вашем API"
+title: "Wiki Lies, Prod is Silent — Why OpenAPI Should Be the Single Source of Truth for Your API"
 date: 2025-06-03 18:00:00 +0000
 tags: [OpenAPI]
-lang: ru
+lang: en
 ---
 
-*[Read in English →]({{ '/en/2025/06/03/openapi-source-of-truth/' | relative_url }})*
+*This article is an English translation. [Читать оригинал на русском →]({{ '/2025/06/03/openapi-source-of-truth/' | relative_url }})*
 
 ---
 
+**Note:** Full translation in progress. Below is the original Russian text.
+
+---
 # Краткий обзор ландшафта Habr и позиционирование статьи
 
 Я просмотрел существующие русскоязычные материалы Habr по теме OpenAPI. Тема покрыта плотно, но почти исключительно в двух жанрах: (1) технические how-to («как настроить генерацию в Spring Boot», «работа с OpenAPI в Go», «проектирование спецификации OpenAPI») и (2) корпоративные кейсы (МТС «Documentation-Driven Development: как мы генерируем Go-код из OpenAPI-спецификаций», ЮMoney про Contract-First и межсерверное взаимодействие, АльфаСтрахование, GlowByte, Ozon Tech). Подавляющее большинство — backend-центричные (Go, Java/Spring, PHP), плюс отдельные фронтенд-тексты про TypeScript-генерацию.
