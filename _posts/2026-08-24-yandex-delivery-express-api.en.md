@@ -27,9 +27,9 @@ client generated from a contract rather than a hand-rolled networking layer. Tha
 argued for at length in [an earlier article]({{ '/2025/06/03/openapi-source-of-truth.en/' | relative_url }}):
 one machine-readable document, and everything else derived from it.
 
-Habr has exactly one article about the Swift generator itself — [a sceptical review from Ozon Tech's
-iOS team](https://habr.com/ru/companies/ozontech/articles/769624/) — and none at all about integrating
-with Yandex Delivery's Express API. The closest thing is [a tariff-optimisation case study from
+Searching Habr I found exactly one article about the Swift generator itself — [a sceptical review from
+Ozon Tech's iOS team](https://habr.com/ru/companies/ozontech/articles/769624/) — and, across a dozen
+phrasings, none at all about integrating with Yandex Delivery's Express API. The closest thing is [a tariff-optimisation case study from
 GRI](https://habr.com/ru/companies/gri/articles/924986/), which is about economics rather than the
 contract.
 
