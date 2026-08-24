@@ -6,7 +6,7 @@ tags: [OpenAPI]
 lang: en
 ---
 
-*This article is an English translation. [Читать оригинал на русском →]({{ '/2025/06/03/openapi-source-of-truth/' | relative_url }})*
+*This article is an English translation. [Читать оригинал на русском →]({{ '/2025/06/03/openapi-source-of-truth.ru/' | relative_url }})*
 
 ---
 

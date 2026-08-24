@@ -6,7 +6,7 @@ tags: [OpenAPI]
 lang: ru
 ---
 
-*[Read in English →]({{ '/en/2025/06/03/openapi-source-of-truth/' | relative_url }})*
+*[Read in English →]({{ '/2025/06/03/openapi-source-of-truth.en/' | relative_url }})*
 
 ---
 
