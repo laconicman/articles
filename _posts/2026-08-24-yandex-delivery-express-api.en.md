@@ -27,6 +27,12 @@ client generated from a contract rather than a hand-rolled networking layer. Tha
 argued for at length in [an earlier article]({{ '/2025/06/03/openapi-source-of-truth.en/' | relative_url }}):
 one machine-readable document, and everything else derived from it.
 
+Habr has exactly one article about the Swift generator itself — [a sceptical review from Ozon Tech's
+iOS team](https://habr.com/ru/companies/ozontech/articles/769624/) — and none at all about integrating
+with Yandex Delivery's Express API. The closest thing is [a tariff-optimisation case study from
+GRI](https://habr.com/ru/companies/gri/articles/924986/), which is about economics rather than the
+contract.
+
 There was no document to derive anything from. So I wrote one: 2,028 lines of OpenAPI covering the six
 operations of the ordering lifecycle — `offers/calculate`, `claims/create`, `claims/info`,
 `claims/accept`, `claims/cancel-info`, `claims/cancel` — transcribed by hand from Yandex's HTML help
@@ -53,7 +59,7 @@ does not match, that is the point rather than an error in the text.
 ## What changed: the reference is now generated from a spec
 
 Sometime between July 2025 and today, Yandex's developer documentation grew a set of pages under
-`/api/express/openapi/` — one per method, rendered by [Diplodoc](https://habr.com/ru/articles/765768/),
+`/api/express/openapi/` — one per method, rendered by [Diplodoc](https://habr.com/ru/companies/yandex/articles/765768/),
 Yandex's own open-source documentation toolkit. They are unmistakably generated from an OpenAPI
 document: they show typed properties, `Pattern` assertions, `Enum` value lists, request and response
 bodies, per-operation status codes and named entity definitions with anchors.
@@ -95,6 +101,10 @@ Combine that with the missing `Last-Modified` and you get the practical conseque
 answer the question every integrator eventually asks, which is *"did this change, or did I always read
 it wrong?"* When I found an undocumented `409` in August 2026 and patched my own document to match, the
 reference now documents that same `409`. Did Yandex add it before or after I hit it? Unanswerable.
+
+This is not an isolated habit at the vendor: [a dated audit of Yandex 360's audit log](https://habr.com/ru/articles/1072594/),
+published on Habr three days ago, is the same exercise against a different product, with the same
+finding — the documentation does not contain the thing an integrator needs.
 
 **What I would have done.** Version the document and let the changelog be generated from diffs between
 versions rather than written by hand — a hand-maintained changelog is exactly the kind of documentation
@@ -470,6 +480,10 @@ is a good read. That is precisely why the contract at the edge is worth complain
 is done, and the part that is left is a YAML file and a changelog.
 
 ## How I would have designed it
+
+None of this is original — the list overlaps with [designing quality APIs](https://habr.com/ru/companies/ruvds/articles/942916/)
+and with [ten API mistakes](https://habr.com/ru/articles/1013924/). Which is the uncomfortable part:
+nearly every item is violated by a live API from a major company.
 
 Nothing in this list is specific to delivery. It is what I would want from any vendor API I have to
 integrate against, ordered by what it costs the vendor to do.
