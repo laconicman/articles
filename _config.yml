@@ -61,6 +61,7 @@ exclude:
   - vendor/ruby/
   - README.md
   - LICENSE
+  - notes/          # research notes, kept with the repo but never published
 
 # Minima Theme Customizations
 minima:
