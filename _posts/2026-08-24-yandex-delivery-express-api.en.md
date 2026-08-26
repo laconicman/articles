@@ -1,146 +1,131 @@
 ---
 layout: post
-title: "The Spec Exists Now, and You Still Can't Download It — A Close Read of Yandex Delivery's Express API"
+title: "The Ghost of a Specification — A Close Read of Yandex Delivery's Express API, and How I'd Have Designed It"
 date: 2026-08-24 09:00:00 +0000
 tags: [OpenAPI, API design, Yandex]
 lang: en
+permalink: /2026/08/24/yandex-delivery-express-api/
 ---
 
-*[Читать по-русски →]({{ '/2026/08/24/yandex-delivery-express-api.ru/' | relative_url }})*
+*[Читать по-русски →]({{ '/2026/08/24/yandex-delivery-express-api/' | relative_url }})*
 
 ---
 
-# The spec exists now, and you still can't download it
+# The ghost of a specification
 
-> **In short.** To build a typed client for Yandex Delivery's Express API I had to write the vendor's
-> OpenAPI document myself — 2,028 lines of YAML transcribed from HTML pages. Yandex now publishes a
-> reference that is clearly rendered *from* an OpenAPI document, which is a real improvement; the
-> document itself is still not downloadable, so you cannot generate, lint, mock or diff against it.
-> Below is what a year of reading that documentation and calling the real API taught me, defect by
-> defect, each one paired with what I would have done instead. Some of the defects are mine.
+> **In short.** Yandex Delivery's Express API looks as though it has an OpenAPI document: the
+> reference on the site looks exactly like documentation rendered from one. You cannot download it,
+> and when my company asked officially, the answer was that no specification exists. So I wrote it
+> myself — 2,028 lines of YAML transcribed from HTML pages. Below is what that work and a day of live
+> calls turned up: two incompatible vocabularies of error codes, two timestamp formats in a single
+> response, a misspelled field name, and a reference that contradicts itself. Each item comes with
+> what I would have done instead. Some of the failures are mine.
 
 ## Where this comes from
 
 I write client software for Apple platforms. In 2025 I needed to call Yandex Delivery's Express API —
-the B2B Cargo integration behind same-city courier delivery — from a Swift app, and I wanted a typed
-client generated from a contract rather than a hand-rolled networking layer. That is the approach I
-argued for at length in [an earlier article]({{ '/2025/06/03/openapi-source-of-truth.en/' | relative_url }}):
-one machine-readable document, and everything else derived from it.
+the B2B Cargo service which, once you strip away everything that sounds like a pitch deck, means "a
+courier picks up your box and takes it to an address."
 
-Searching Habr I found exactly one article about the Swift generator itself — [a sceptical review from
-Ozon Tech's iOS team](https://habr.com/ru/companies/ozontech/articles/769624/) — and, across a dozen
-phrasings, none at all about integrating with Yandex Delivery's Express API. The closest thing is [a tariff-optimisation case study from
-GRI](https://habr.com/ru/companies/gri/articles/924986/), which is about economics rather than the
-contract.
+Let me be clear about one thing up front: nobody forced me to generate a client from a contract. I
+could have handed the documentation to a language model and got a pile of `URLSession` or Alamofire
+code out of it, and it would have worked. I wanted to do it properly — no hand-rolled wheels, types
+that catch mistakes at compile time, and no networking layer to maintain by hand afterwards. That is
+the approach I argued for at length in [an earlier article]({{ '/en/2025/06/03/openapi-source-of-truth/' | relative_url }}).
 
-There was no document to derive anything from. So I wrote one: 2,028 lines of OpenAPI covering the six
-operations of the ordering lifecycle — `offers/calculate`, `claims/create`, `claims/info`,
-`claims/accept`, `claims/cancel-info`, `claims/cancel` — transcribed by hand from Yandex's HTML help
-pages and cross-checked against a Postman collection of requests that were known to work.
+And this is where the story starts. The reference on the site looks **exactly like documentation
+built from an OpenAPI document**: typed properties, regular expressions, enumerations, per-operation
+status codes. Which means the work is already done, the file exists, and the only thing missing is a
+link to it. There is no link. My company sent an official enquiry and got an official answer: **there
+is no specification.** That ended the search — where you would normally spend a week wondering whether
+you simply failed to find it, one support reply settles the matter.
 
-Writing a specification for an API you do not own is a strange exercise. Every schema is a hypothesis.
-Nothing validates it except a real request, so the client's live test suite became the only thing
-standing between a hypothesis and a wrong belief. One afternoon of live calls against a **test account**
-in August 2026 found an undocumented status code, five undocumented response fields, a misspelled
-field name, a route point the API invents on its own, and two mutually inconsistent vocabularies of
-error codes in a single field.
+So I wrote the document myself: 2,028 lines of OpenAPI covering the six operations of the ordering
+lifecycle — `offers/calculate`, `claims/create`, `claims/info`, `claims/accept`, `claims/cancel-info`,
+`claims/cancel` — transcribed by hand from the help pages and cross-checked against a Postman
+collection of requests known to work.
 
-Two honest caveats before the substance, because they bound everything that follows.
+Writing a specification for an API you do not own is a peculiar exercise: every schema in it is a
+hypothesis, and only a real request can confirm one. A single day of live calls against a **test
+account** in August 2026 produced an undocumented status code, five undocumented response fields, a
+misspelled field name, a route point the server adds by itself, and two incompatible vocabularies of
+error codes in one field.
 
-**Everything on the wire here was observed on a test account, and it is dated.** Production may differ.
-For most APIs I would treat that as pedantry; for this one it is not, and by the end of this article
-you will see why I do not assume two environments of the same product agree.
+Everything below about the documentation was verified on **24 August 2026**; everything about real
+responses was observed on a test account and is dated where it appears. The dates are not pedantry:
+the pages carry no modification stamp and the changelog stopped three years ago, so "verified on such
+a date" is the only available form of precision.
 
-**Everything about the documentation was verified on 24 August 2026.** That date matters more than it
-usually would, because — as the next section but one explains — the documentation carries no
-"last updated" stamp and its changelog stopped three years ago. If you read this later and something
-does not match, that is the point rather than an error in the text.
+## There is a reference; there is no document
 
-## What changed: the reference is now generated from a spec
+The pages under `/api/express/openapi/` — one per method — are built with
+[Diplodoc](https://habr.com/ru/companies/yandex/articles/765768/), Yandex's own open-source
+documentation toolkit. They carry typed properties, `Pattern` assertions, `Enum` lists, request and
+response bodies, per-operation status codes and named entity definitions with anchors.
 
-Sometime between July 2025 and today, Yandex's developer documentation grew a set of pages under
-`/api/express/openapi/` — one per method, rendered by [Diplodoc](https://habr.com/ru/companies/yandex/articles/765768/),
-Yandex's own open-source documentation toolkit. They are unmistakably generated from an OpenAPI
-document: they show typed properties, `Pattern` assertions, `Enum` value lists, request and response
-bodies, per-operation status codes and named entity definitions with anchors.
+This is a real improvement, and I want to say so before I start listing complaints: the pages I
+transcribed in 2025 had none of that. Today's reference documents the route point the API adds by
+itself, gives money fields their regular expression, and enumerates claim statuses.
 
-This is a genuine improvement, and I want to say so plainly before I start listing what is wrong with
-it. The HTML pages I transcribed in 2025 had none of that structure. Today's reference documents the
-route point the API adds by itself, gives money fields their regular expression, and enumerates claim
-statuses. Somebody did real work here.
+What it does not do is hand you the document. There is no download link on any page — I collected
+every `<a href>` on the `claims/create` page and filtered for `.json`, `.yaml`, `download` and `spec`:
+nothing. No "specification" or "download" wording in the page text either. The pages do not even
+return a `Last-Modified` header.
 
-What it does not do is hand you the document. There is no download link on any of those pages — I
-checked programmatically, collecting every `<a href>` on the `claims/create` page and filtering for
-anything matching `.json`, `.yaml`, `download` or `spec`. Nothing. No "specification" or "download"
-wording anywhere in the page text either. The pages do not even return a `Last-Modified` header;
-they are served `cache-control: no-store`.
-
-So the contract exists inside Yandex — you can see its shadow on every page — and what is published is
-the shadow.
-
-**What I would have done.** Publish the file. It already exists; serving it is a link, not a project.
-The moment it is downloadable, everything I had to hand-build becomes free for every integrator:
-a generated client in any language, a [Spectral](https://stoplight.io/open-source/spectral) lint run,
-a [Prism](https://stoplight.io/open-source/prism) mock server so client teams can start before
-credentials arrive, contract tests that catch drift, and an `oasdiff` job that tells *you*, the vendor,
-when a change you are about to ship breaks somebody. A rendered reference helps a human read. A
-document helps everyone else's machines, and machines are most of the audience.
+**What I would have done.** Publish the file. It exists — there would be nothing to render these pages
+from otherwise — and serving it is a link, not a project. The moment it is downloadable, everything I
+had to build by hand becomes free for every integrator: a client in any language, a
+[Spectral](https://stoplight.io/open-source/spectral) run as an executable style guide, a
+[Prism](https://stoplight.io/open-source/prism) mock server so client teams can start before
+credentials arrive, contract tests against drift, and an `oasdiff` job that tells the vendor what it
+is about to break. A rendered reference helps a human read. The document helps everyone else's
+machines, and machines are most of the audience.
 
 ## The changelog stopped in 2023
 
-The "История изменений" (release notes) page is a table with three rows. All three are dated
-**17 July 2023**: the addition of `offers/calculate`, the `offer_payload` parameter it forced into
-`claims/create`, and an `expected_visit_interval` field in the `claims/info` response.
+The release-notes page is a table with three rows, all dated **17 July 2023**.
 
 Meanwhile the documentation index lists methods that appear nowhere in that table: editing a claim
 before and after confirmation, skipping a route point, claim search, a change journal, a confirmation
 code, proof of delivery, marking a point ready — and three methods for handing a parcel over **to a
-robot**. The API has visibly grown for three years and the changelog has not noticed.
+robot**. The API has grown visibly for three years; the changelog has not noticed.
 
-Combine that with the missing `Last-Modified` and you get the practical consequence: there is no way to
-answer the question every integrator eventually asks, which is *"did this change, or did I always read
-it wrong?"* When I found an undocumented `409` in August 2026 and patched my own document to match, the
-reference now documents that same `409`. Did Yandex add it before or after I hit it? Unanswerable.
+The practical consequence is that you cannot answer the question every integrator eventually asks:
+*"did this change, or did I always read it wrong?"* When I found an undocumented `409` in August 2026
+and patched my own document, it turned out that today's reference documents the same `409`. Whether it
+appeared there before or after I hit it is unknowable.
 
-This is not an isolated habit at the vendor: [a dated audit of Yandex 360's audit log](https://habr.com/ru/articles/1072594/),
-published on Habr three days ago, is the same exercise against a different product, with the same
-finding — the documentation does not contain the thing an integrator needs.
+This is not an isolated habit at the vendor: [a dated audit of Yandex 360's audit
+log](https://habr.com/ru/articles/1072594/) is the same exercise against a different product, with the
+same finding.
 
-**What I would have done.** Version the document and let the changelog be generated from diffs between
-versions rather than written by hand — a hand-maintained changelog is exactly the kind of documentation
-that goes stale first, which is [the argument the MTS team makes](https://habr.com/ru/companies/ru_mts/articles/1003562/)
-about hand-written API docs generally. Failing that, stamp each page with the date it was generated.
-It costs one template change and it converts an unanswerable question into a lookup.
+**What I would have done.** Version the document and generate the changelog from diffs between
+versions — a hand-written one goes stale first, which is [exactly the argument the MTS team
+makes](https://habr.com/ru/companies/ru_mts/articles/1003562/). Failing that, stamp each page with its
+build date.
 
-## `droppof_point`: a typo that shipped, and had to stay
+## `droppof_point`: a typo that shipped
 
-Every cargo item in a claim response carries two fields with the same meaning:
+Every cargo item in a response carries two fields with the same meaning:
 
 ```json
 "dropoff_point":  26389626087876,
 "droppof_point":  26389626087876
 ```
 
-The second one is a misspelling of the first. It reached production, integrators wrote code against it,
-and from that moment removing it would have broken them — so it is sent forever. Today's reference
-documents it, and the entire description of the field reads:
+The second is a misspelling of the first. It reached production, integrators wrote code against it,
+and removing it became impossible. There is no per-endpoint versioning here either: the new version
+was merged into the old one, there is no `v3` and not even a compatibility flag — so there is no place
+where the typo could have been dropped.
 
-> deprecated, use dropoff_point
+Every API older than a couple of years has one of these, and on its own this is the most sympathetic
+item in the article. What is worse than the typo is what the documentation does with it:
 
-I want to be careful here, because this is the *most sympathetic* defect in this article. Every API of
-any age has one. The interesting part is not that somebody mistyped a word; it is what the
-documentation does with it afterwards, and there the handling is worse than the typo:
-
-- The deprecation lives in prose. OpenAPI has a `deprecated: true` flag that generators, linters and
-  diff tools understand, and the renderer plainly supports it: every page ships an abbreviation
-  definition for a `Deprecated` badge ("No longer supported, please use an alternative and newer
-  version"). Across the six operation pages I checked, **nothing carries that badge** — the only
-  deprecation in the whole reference is this lowercase sentence inside a description. A machine
-  reading this document cannot tell the field is deprecated, and a machine is what reads documents.
-- There is no date and no policy. Deprecated since when? Removed when? "Deprecated forever" is a
-  legitimate answer — it is probably the true one — but it should be written down.
-- The field is still in the **request** examples. In the `claims/create` sample body, which appears four
-  times on the page, you will find:
+- **The deprecation lives in prose.** The entire description of the field reads "deprecated, use
+  dropoff_point". OpenAPI has a `deprecated: true` flag that generators, linters and diff tools
+  understand. The renderer supports it — every page defines a `Deprecated` badge — yet across the six
+  method pages no field carries one.
+- **The field is still in the request examples**, with a different value from the correct one:
 
   ```json
   "pickup_point": 1,
@@ -148,87 +133,62 @@ documentation does with it afterwards, and there the handling is worse than the 
   "droppof_point": 0,
   ```
 
-  Two fields that mean the same thing, in an example a newcomer will copy, carrying **different
-  values**. The example teaches the mistake it is documenting.
+  The example teaches the mistake it documents.
 
-**What I would have done.** Keep the field — that part is right, and breaking integrators to fix a
-spelling would be vanity. Then set `deprecated: true` in the document so tooling can see it, put the
-date and the intent in the description ("kept for backward compatibility, will not be removed, always
-mirrors `dropoff_point`"), and delete it from every example.
+**What I would have done.** Keep the field — breaking integrators over spelling would be vanity. Set
+`deprecated: true`, write in the description that it will not be removed and always mirrors
+`dropoff_point`, and take it out of the examples.
 
 ## Two error vocabularies, and they disagree with each other
 
-Every error in this API comes back in the same envelope:
+Every error arrives in the same structure: `{"code": "...", "message": "..."}`. That is a good
+decision. What is not good is that `code` holds three vocabularies rather than one.
 
-```json
-{"code": "...", "message": "..."}
-```
+**First**, symbolic domain codes: `not_found`, `state_mismatch`, `estimating.too_many_loaders`. Stable,
+and worth branching on.
 
-That is a good decision. What goes into `code` is not one vocabulary but three.
-
-**First**, symbolic domain codes: `not_found`, `state_mismatch`, `estimating.too_many_loaders`. These are
-stable and worth branching on.
-
-**Second**, the HTTP status as a string, with a message that leaks the parser's internal state. Both of
-these came back from real calls:
+**Second**, the HTTP status as a string, with a message that leaks the parser's internals:
 
 ```json
 {"code":"400","message":"Parse error at pos 763, path 'route_points': incorrect size, must be 2 (limit) <= 1 (value)"}
 {"code":"400","message":"Value of query 'claim_id': incorrect size, must be 32 (limit) <= 3 (value)"}
 ```
 
-`"code": "400"` tells a caller nothing the HTTP status line did not already say, and `pos 763` is an
-offset into a buffer the caller cannot see.
+`"code": "400"` says nothing the status line did not, and `pos 763` is an offset into a buffer the
+caller cannot see.
 
-**Third — and this is the one that surprised me — the documentation contains two different names for
-the same failure.** The error reference lists:
+**Third: the documentation gives the same error two different names.** The error reference says "too
+many loaders" is `too_many_loaders` with status **400**. The `offers/calculate` page, in the same
+documentation set on the same day, documents a **409** whose `code` is a closed list of 23 values,
+among them `estimating.too_many_loaders`. The real response settles it: on 12 August 2026 I got
+`409 {"code":"estimating.too_many_loaders", ...}`.
 
-| Status | Code |
-|---|---|
-| 400 | `too_many_loaders` — "the maximum number of loaders is 2" |
+A reader has no way to know which page to believe, and the one that is wrong is the one titled "Error
+reference". That reference is eleven rows long for an API of thirty-odd methods, and it mixes registers
+inside its own table: `unauthorized` and `inappropriate_status` are machine codes, `Internal server
+error` and `Parse error` are English sentences, all typeset identically.
 
-The `offers/calculate` page, in the same documentation set, on the same day, documents a `409` whose
-`code` is a closed list of 23 values, including:
-
-```
-estimating.too_many_loaders
-```
-
-So: same refusal, two codes, two status codes, two pages. The wire settles it — on 12 August 2026 I got
-`409 {"code":"estimating.too_many_loaders", "message":"В выбранном кузове не получится заказать столько
-грузчиков"}` — but a reader has no way to know which page to believe, and the one that is wrong is the
-one titled "Error reference".
-
-That reference, incidentally, is eleven rows long for an API of thirty-odd methods, and it mixes
-registers within its own table: `unauthorized` and `inappropriate_status` are machine codes,
-`Internal server error` and `Parse error` are English sentences, all four typeset identically as code.
-
-**What I would have done.** One vocabulary, and it is the symbolic one. Never put the HTTP status in
-the body — it is already in the status line. Keep `message` human and unstable, add a structured
-`details` object for the machine-readable specifics (which field, which limit) instead of formatting
-them into prose, and never let a parser offset out of the building. Then declare the codes per operation
-in the document, as the `offers/calculate` page already does, and delete the free-floating error page —
-if it disagrees with the operations, it is not a reference, it is a second source of truth. This is the
-same argument [Konstantin Moseenko makes for informative API errors](https://habr.com/ru/companies/otus/articles/1018008/):
-an error is a value your caller programs against, not a log line.
+**What I would have done.** One vocabulary, the symbolic one. No HTTP status inside the body.
+`message` stays human and unstable; the machine-readable specifics — which field, which limit — move
+into a structured `details` object, and parser offsets never leave the building. Codes get declared per
+operation in the document, as the `offers/calculate` page already does, and the standalone error page
+goes away: if it disagrees with the operations, it is not a reference, it is a second source of truth.
+This is the same argument [Konstantin Moseenko makes for informative API
+errors](https://habr.com/ru/companies/otus/articles/1018008/) — an error is a value your caller
+programs against, not a log line.
 
 ## Is it three days or five?
 
-The error reference says:
+The error reference: "`delay_too_long` — the maximum number of days for the `due` field is 3." The
+`Due` entity on the `claims/create` page: "by 30–240 minutes for the `express` tariff; **by five days**
+for the `cargo` tariff." Both pages are current as of 24 August 2026.
 
-> `delay_too_long` — the maximum number of days for the `due` field is 3
-
-The `Due` entity on the `claims/create` page says the arrival time can be deferred
-
-> by 30–240 minutes for the `express` tariff; **by five days** for the `cargo` tariff
-
-Both pages are current as of 24 August 2026. I have not tested which one the server enforces, and
-that is deliberate: the point is not which number is right, it is that a careful reader who checks two
-pages ends up less certain than one who checks one.
+I did not test which number the server enforces, deliberately: the point is not which is right, but
+that a careful reader who checks two pages ends up less certain than one who checks a single page.
 
 ## Which statuses can an operation return? Depends who you ask
 
-Here is my hand-written document against Yandex's reference, operation by operation:
+My hand-written document against Yandex's reference:
 
 | Operation | My document | Yandex's reference |
 |---|---|---|
@@ -239,32 +199,28 @@ Here is my hand-written document against Yandex's reference, operation by operat
 | `claims/cancel-info` | 200 400 401 404 409 429 500 | 200 400 404 |
 | `claims/cancel` | 200 400 401 409 429 500 | 200 400 404 409 |
 
-Two things stand out, and one of them is my fault.
+**`401` is not declared on a single operation.** All of them require authentication, the error
+reference knows about `401`, and the very first live call I made returned
+`401 {"code":"unauthorized","message":"Access denied"}` because the token had expired. A client
+generated strictly from the published reference meets the most common failure in any integration as an
+undocumented response. The same goes for `500`.
 
-**`401` is not declared on a single operation.** Every one of them is authenticated; the error reference
-documents `401 unauthorized`; and the very first live call I ever made against this API returned
-`401 {"code":"unauthorized","message":"Access denied"}` because the token had expired. A generated client
-built strictly from the published reference treats the most common failure in any integration as an
-undocumented response. The same is true of `500`.
-
-**`403` on `claims/create` is in their document and missing from mine.** That is a hole in my
-specification, found by writing this article, and it is exactly the failure mode of owning a document
-nobody else validates.
+**`403` on `claims/create` is in their document and missing from mine.** Either a hole in my
+specification or drift in their documentation — whether the code appeared after I transcribed the page
+or I simply missed it, there is no way to tell, for exactly the reason in the previous section.
 
 **What I would have done.** Declare the shared failures once in `components/responses` and `$ref` them
-from every operation — three lines each, and then a generated client has a case for the thing that
-happens most often. My own document does this; it is not a hard pattern, it is just one nobody
-remembers to apply to authentication because authentication feels like infrastructure rather than API.
+from every operation — three lines each, and a generated client gains a case for the thing that happens
+most often.
 
-## Timestamps: valid, and not consistent
+## Timestamps: formally valid, practically unbearable
 
-The document declares timestamp fields as `string<date-time>`, which means RFC 3339. The examples in
-the documentation itself come in two shapes: `2020-01-01T07:00:00+00:00` and
-`2023-07-17T08:02:26.607358+00:00`.
+Timestamp fields are declared `string<date-time>`. The examples in the documentation itself come in two
+shapes: `2020-01-01T07:00:00+00:00` and `2023-07-17T08:02:26.607358+00:00`.
 
-The wire is more varied than that. One `offers/calculate` response, captured on 12 August 2026, carried
-**21 timestamps with six-digit fractional seconds and 4 with none** — including a single interval object
-whose `from` had a fraction and whose `to` did not:
+Real responses show the same spread. One `offers/calculate` response captured on 12 August 2026 carried
+**21 timestamps with six-digit fractional seconds and 4 with none** — including an interval whose
+`from` had a fraction and whose `to` did not:
 
 ```json
 "pickup_interval": {
@@ -273,253 +229,262 @@ whose `from` had a fraction and whose `to` did not:
 }
 ```
 
-Same object, same field type, same response, same second of wall-clock time.
+One object, one field by meaning, one response.
 
-Here I have to be fair, because the obvious accusation is wrong: **both forms are valid RFC 3339.**
-Fractional seconds are optional in the standard, and a server that emits them sometimes is not
-violating anything. The cost is not standards compliance, it is that the variance is invisible in the
-schema. A code generator installs one date decoder for every `date-time` field in the API; that decoder
-must now be liberal enough for both shapes, and nothing in the document tells you so. You find out from
-a failed decode, in production, on a field you were not thinking about.
+Formally both forms are allowed: RFC 3339 permits a fractional part and does not require it. But
+"allowed" and "works" are different things, and here is what Foundation's standard decoders do with
+these exact strings (Swift 6.3.3, macOS 26.5):
 
-And there is a sharper version of the problem on the way out. Reading, you can afford to accept
-anything. Writing, you have to pick one shape, and the document gives you no basis for picking. I kept
-whatever shape the client that had been talking to the live API already sent, and wrote down the
-question rather than "fixing" it toward symmetry — because the feedback for guessing wrong here is not
-a failed test, it is a delivery that does not happen.
+| Input | `JSONDecoder.iso8601` | `ISO8601DateFormatter` | `…+.withFractionalSeconds` |
+|---|---|---|---|
+| `…T17:12:40.051944+00:00` | ok | **FAIL** | ok |
+| `…T18:15:00+00:00` | ok | ok | **FAIL** |
 
-**What I would have done.** Pick one representation, state it in the field description with an example,
-and emit it everywhere. If the backend genuinely cannot promise that — different services, different
-serializers, a legacy path — then say *that* in the description. "Fractional seconds may or may not be
-present" is a poor guarantee and an excellent piece of documentation.
+`ISO8601DateFormatter` — the platform's own tool — **cannot be configured to accept both**: turn
+fractional seconds on and it fails on the value without them, turn them off and it fails on the value
+with them. Both values arrive in the same object. You are left writing your own transcoder that tries
+each shape in turn, or catching the failure and retrying with the other format.
 
-## Money: strings, and a pattern that permits nonsense
+One more detail that explains why this trips up more than just Apple: six digits are microseconds, and
+the canonical text representation in ISO 8601 stops at milliseconds. Formally there is nothing to
+object to; practically you have stepped outside what other people's libraries are obliged to
+understand.
 
-Prices cross the wire as decimal strings, and the reference pins them with a regular expression:
+Writing is sharper still: reading, you can accept anything; writing, you must pick one shape, and the
+document gives you no basis for picking. I kept the shape the previously working client already sent
+and wrote the question down rather than "correcting" it toward symmetry — the feedback for guessing
+wrong here is not a failed test but a delivery that does not happen.
+
+**What I would have done.** One format, pinned in the field description with an example, identical in
+both directions. If the backend honestly cannot promise that, document *that*: "the fractional part may
+or may not be present" is a poor guarantee and excellent documentation.
+
+## Money as strings
+
+Prices travel as decimal strings, and the reference pins them with a regular expression:
 
 ```
 ^-?[0-9]{1,14}(\.[0-9]{0,4})?$
 ```
 
-Two observations. Money in this API is charged in roubles and kopecks — two decimal places — but the
-pattern allows four. And because the fractional group is `{0,4}` rather than `{1,4}`, the pattern
-accepts a bare trailing dot: `"1449."` is a valid amount according to the vendor's own document.
+Strings for money are an acceptable, explicable choice: JSON has no decimal type. Plenty of APIs use
+`double` in this role and the industry has long since learned not to trip over rounding, so this is a
+"debatable but fine" decision.
 
-On the wire, in one response object, I saw `"total_price":"1449"` alongside
-`"total_price_with_vat":"1767.78"`. A reader that assumed two decimal places would have been wrong about
-the first.
+The argument is not about strings, it is about the pattern. Money here is roubles and kopecks — two
+digits — and the pattern allows four. And because the fractional group is `{0,4}` rather than `{1,4}`,
+it accepts a bare trailing dot: `"1449."` is a valid amount according to the vendor's own document. In
+a real response, one object carried `"total_price":"1449"` next to `"total_price_with_vat":"1767.78"`.
 
-Strings for money are, to be clear, the right call — floating point in JSON is how you get a price of
-`807.6000000000001`. The problem is a pattern loose enough to describe values the system cannot mean.
-
-**What I would have done.** Either integer minor units (`144900` kopecks, no ambiguity, no parser) or a
-decimal string with a fixed scale — `^-?\d{1,14}\.\d{2}$` — and the scale stated in words. If four
-decimals are genuinely possible somewhere, say where. A pattern is a promise; a loose one promises
-things you will have to support later.
+**What I would have done.** Either integer minor units (`144900` kopecks — no ambiguity and no parser)
+or a decimal string with a fixed scale, `^-?\d{1,14}\.\d{2}$`, with the scale stated in words. A
+pattern is a promise, and a loose one promises what you will have to support later.
 
 ## The server invents a route point
 
-Create a claim with two route points — a pickup and a destination — and the response contains three.
-Yandex appends a `return` point of its own:
+Create a claim with two points — pickup and destination — and the response has three: Yandex adds its
+own `return` point. This is in the reference now, and the description is good: the return point "is
+added automatically and by default coincides with the pickup point". The pages I transcribed in 2025
+did not mention it, and I learned about the third point from a response.
 
-```
-point id=26389626087875 type=source      visit=pending
-point id=26389626087876 type=destination visit=pending
-point id=26389626087877 type=return      visit=pending
-```
+The adjacent behaviour is worth stating because people trip on it. The point identifiers the client
+sends are not echoed back: I numbered my points `1` and `2`, the response numbered them
+`26389626087875` and `26389626087876`, and every referencing field was renumbered with them —
+`items[].pickup_point`, `items[].dropoff_point`.
 
-Credit where it is due: **today's reference documents this**, and the description is good — the return
-point "is added automatically and by default coincides with the pickup point". In the pages I
-transcribed in 2025 it was not there, and finding three points where I sent two is how I learned about
-it.
+So why send them at all? Because inside the request they are the join key: an item says "collect me at
+point 1, deliver me to point 2", and there is no other way to express that — `point_id` is documented
+as required. What is awkward is that in the response the same field means something else: the
+identifier the server assigned. One name, two things, and a client that misses the difference builds
+logic on numbers that live until the end of the request.
 
-The related behaviour is still worth stating because it catches people. The point identifiers a caller
-sends are not echoed back. I numbered my points `1` and `2`; the response numbered them
-`26389626087875` and `26389626087876`, and every field that references a point — `items[].pickup_point`,
-`items[].dropoff_point` — was renumbered with them. Any client-side logic that derives a new point id as
-"the highest one I have seen, plus one" is building on numbers that live exactly as long as the request.
-
-**What I would have done.** Model the request point and the response point as two schemas rather than
-one. They genuinely are different types: one carries an identifier the client chose and the server will
-discard, the other carries an identifier the server assigned and the client must not invent. Reusing one
-schema for both saves a few lines in the document and moves the confusion into every consumer.
+**What I would have done.** Describe the request point and the response point as two schemas. They
+really are different types: in one the identifier was chosen by the client and will be discarded, in
+the other it was assigned by the server and must not be invented. One schema for both saves a few lines
+in the document and moves the confusion into every consumer.
 
 ## Advice that does not bind
 
-There is an endpoint whose whole purpose is to tell you what cancelling would cost:
-`claims/cancel-info`. On a fresh claim it answered `{"cancel_state":"free"}`. Cancelling a moment later
-returned:
+There is a method whose whole job is to say what cancelling would cost: `claims/cancel-info`. On a
+fresh claim it answered `{"cancel_state":"free"}`. Cancelling a minute later returned
+`409 {"code":"state_mismatch"}`. The same claim cancelled without complaint a few minutes after that:
+it had been mid-estimation, and the refusal was about a transient state `cancel-info` said nothing
+about, because it reports price, not permission.
 
-```json
-409 {"code":"state_mismatch","message":"Недопустимое действие над заявкой"}
-```
+Two consequences. A cancellation that fails is not necessarily one that will keep failing, so cleanup
+code should re-read the status and retry. And a method whose advice can be contradicted one call later
+needs to say so.
 
-The same claim cancelled successfully a few minutes later. Nothing was wrong with the request; the
-claim had been mid-estimation, and the refusal was about a transient state that `cancel-info` had not
-mentioned, because `cancel-info` reports price, not permission.
-
-Two practical consequences. A cancellation that fails is not necessarily one that will keep failing, so
-cleanup code should re-read the status and retry rather than give up. And an advisory endpoint whose
-advice can be contradicted one call later needs to say so.
-
-**What I would have done.** Either give the advisory answer a stated validity — the conditions under
-which it holds, the states in which cancellation is refused regardless of price — or make it a dry run
-of the real operation, returning exactly what the real call would return minus the effect. The failure
-here is not the 409; it is that two endpoints describe the same act and only one of them knows the
-answer.
+**What I would have done.** Either give the advice conditions and a validity window — which states
+refuse cancellation regardless of price — or make it a dry run of the real operation: return exactly
+what the real call would return, minus the effect.
 
 ## Constraints that exist only on the server
 
-Ask for a `cargo_loaders` count on the `express` tariff and the API refuses with
-`409 estimating.too_many_loaders`. Ask for the same loaders on `cargo` with a body type and it is
-accepted. Nothing in the document expresses that dependency, and nothing offline can catch it: a stub
-transport accepts whatever you hand it, so a request fixture can be wrong from the day it is written
-and every offline test will still pass. Mine was.
+Ask for `cargo_loaders` on the `express` tariff and you get `409 estimating.too_many_loaders`. Ask for
+the same loaders on `cargo` with a body type and the claim is accepted. No schema expresses that
+dependency and no offline test catches it: a stub transport accepts whatever you hand it, so a request
+fixture can be wrong from the day it is written while every offline test stays green. Mine was.
 
-This one is only half a criticism. Cross-field constraints are genuinely hard to express in JSON Schema,
-and the ones that depend on tariff, region and account state are not expressible at all.
+I cannot push this one very hard: cross-field constraints are poorly expressed in JSON Schema, and the
+ones that depend on tariff, region and account state cannot be expressed at all.
 
-**What I would have done.** Write them down in prose, in the description of the field they constrain —
-"not available with `taxi_class: express`" is one sentence and it would have saved me an afternoon. For
-the constraints that vary by account, an endpoint that reports what *this* account can order beats any
-amount of documentation, and this API is one step away from having it: `offers/calculate` already knows.
+**What I would have done.** Write them in prose, in the description of the field they constrain: "not
+available with `taxi_class: express`" is one sentence that would have saved me half a day. For
+account-dependent constraints, an endpoint reporting what *this* account can order beats any amount of
+documentation — and it is one step away: `offers/calculate` already knows.
 
 ## The webhook builds its URL by concatenation
 
-This one is documented, so I am quoting rather than reporting. On status changes, Yandex calls back to
-a URL you register, appending the claim id and a timestamp. From the `claims/create` page:
+A quote from the `claims/create` page is enough here:
 
 > Important: the parameters are appended to `callback_url` by concatenation, that is, a url of the form
 > `https://example.com` will turn into the invalid `https://example.comupdated_ts=...&claim_id=...`
 
-So the documented behaviour is that the vendor will build a malformed URL unless your callback happens
-to end in `?` or `&`. Writing it down is better than not writing it down. It is not better than parsing
-the URL and merging the query, which is a library call in every language this service is written in.
+The documented behaviour is that the vendor will build a malformed URL unless your address happens to
+end in `?` or `&`. Writing it down beats not writing it down; it does not beat parsing the URL and
+merging the query, which is a library call in any language.
 
-**What I would have done.** Merge the query properly — or, better, put the payload in the body of the
+**What I would have done.** Merge the query properly — better still, put the payload in the body of the
 POST request, where a status notification belongs, rather than in a query string that ends up in access
-logs. Then delete the paragraph.
+logs.
 
 ## Access, tokens, and the sandbox that is not one
 
-To start, you get a login and password "from your Yandex Delivery manager", sign into the dashboard and
-press a button to obtain a token. The quickstart says, twice, that in case of problems you should
-contact your manager.
+Credentials come through the dashboard: a manager issues a login and password, then there is a button
+that produces a token, and anything the dashboard cannot do goes through support. That part works.
 
-The token, per the same page, "is valid for an unlimited time". There is one host in the entire
-documentation — production. There is no sandbox. There is a test *cabinet*, which you can infer only
-from an entry in the error reference: `required_tariffs_disabled_for_user` — "the test cabinet has
-expired". So the test environment is a time-limited account on the production system, and when it
-lapses you find out through an error code.
+What does not work is the token, which per the same page "is valid for an unlimited time". An unlimited
+bearer token is a credential with no answer to "what if it leaks?": no lifetime, no rotation, no
+scopes.
 
-The page titled "Technical integration details" is, in full, one sentence about using TLS 1.2 and PCI
-DSS v4 cipher suites.
+And there is no sandbox: the documentation has exactly one host, production. A test *cabinet* exists,
+but as far as I can tell you can only learn about it from a line in the error reference —
+`required_tariffs_disabled_for_user`, "the test cabinet has expired". So the test environment is a
+time-limited account on the production system, and you discover its expiry through an error code.
 
-I am not going to pretend this is unusual for a Russian B2B logistics API — it is not — but it has a
-cost, and Vladimir Sinyavsky's ["all tests green, payments stuck"](https://habr.com/ru/articles/1050584/)
-piece names it precisely: without a sandbox that behaves like production, your test suite measures your
-own assumptions. Everything I know about this API's behaviour is scoped to one test account, and I say
-so every time I say anything about it, which is not a rhetorical tic — it is the actual epistemic
-situation.
+The page titled "Technical integration details" consists, in full, of one sentence about TLS 1.2 and
+PCI DSS v4 cipher suites.
 
-**What I would have done.** Self-service credentials, tokens with a lifetime and a rotation story
-(an unlimited bearer token is a credential with no answer to "it leaked"), and a sandbox with a written
-statement of how it differs from production. The statement matters more than the sandbox: "identical
-except that no courier is dispatched and no money moves" is a sentence that tells an integrator exactly
-how far to trust their green tests.
+For a Russian B2B logistics API this is ordinary, but it has a cost, and Vladimir Sinyavsky names it
+precisely in ["all tests green, payments stuck"](https://habr.com/ru/articles/1050584/): without a
+sandbox that behaves like production, your test suite measures your own assumptions.
 
-## Now my own mistakes, because the document was mine
+**What I would have done.** Tokens with a lifetime and a rotation story. And a sandbox whose
+differences from production are, first, written down and, second, minimal: "identical to production
+except that no courier is dispatched and no money moves" tells an integrator exactly how far to trust
+their green tests.
 
-It would be cheap to write all of this as though the client had been correct throughout. It was not,
-and the most instructive failure of the whole project was mine.
+## Now my own failure, which is about the same thing
 
-**I modelled an advisory field as a closed enum, and lost entire responses.** Claim responses carry a
-`warnings` array, each with a `source`. I enumerated the values I had seen. On 17 August 2026 a live
-`claims/info` returned `"source": "taxi_requirements"` — a value not in my enum — and decoding threw.
-Not the warning: **the whole claim response**. A piece of advisory text took the payload down with it.
+It would be cheap to write all of this as though my client had been right throughout. It was not.
 
-It was worse than a failed request, because a polling loop read `status` through that same call. Claims
-that had in fact progressed to `ready_for_approval` looked frozen at `new` for an hour, and I spent that
-hour convinced the API was not estimating.
+Claim responses carry a `warnings` array, each warning with a `source`. In my specification I
+enumerated the values I had seen — I made the enumeration closed. On 17 August 2026 a live
+`claims/info` returned `"source": "taxi_requirements"` and decoding threw. Not the warning: **the whole
+claim response.** A piece of advisory text took the payload down with it.
 
-Two things make this squarely my fault. Yandex's own document types that field as **`Type: string`** —
-an open string, with two known values listed in prose. I made it stricter than the vendor claimed it
-was. And the third value is named after a section of the request body (`taxi_requirements` is a field in
-`claims/create`), which means the vocabulary grows with the request schema and was never closeable in
-the first place.
+It was worse than a failed request, because a polling loop read `status` through the same call, so
+claims that had reached `ready_for_approval` looked stuck at `new`, and I spent an hour certain the API
+was not estimating.
 
-The rule I took away, and it is the one I would give anyone generating a client from a document they
-wrote themselves: **a closed enum is a decode-time assertion that takes the whole payload with it when
-it fails.** Model one where a caller must branch exhaustively and a new value is a real decision —
-tariff class, cancellation type. Anywhere the field is advisory, descriptive or diagnostic, use a
-string. Be liberal in what you accept.
+This is not about typing — an untyped client with a closed set of expected values would have had just
+as bad a time, only failing somewhere else. It is that **the specification was wrong.** Yandex's
+document types the field as `Type: string` — an open string with two known values listed in prose; the
+third is named after a section of the request body (`taxi_requirements` is a field in `claims/create`),
+so the vocabulary grows with the request schema and was never closeable. I made it stricter than the
+vendor claimed — though the documentation also leaves room for interpretation here, and I interpreted
+badly.
 
-Two smaller ones, in the same spirit. My `ClaimStatus` enum has 27 values against the reference's 26;
-the extra is `pay_waiting`, which I cannot now source. My `TaxiClass` carries `sdd_long` with a comment
-next to it saying it should not be there. And an early draft of the specification — written fast, from
-the HTML pages — declared a second server, `https://b2b.taxi.tst.yandex.net`, labelled `Sandbox`. No
-such host appears in the documentation or in the collection of requests that actually worked. When you
-write a document for an API you do not own, invention is not a hypothetical risk.
+The rule I took away: **a closed enumeration is an assertion checked at decode time, and when it fails
+it takes the whole response with it.** Enumerate where the caller must handle every case and a new
+value is a real decision — tariff class, cancellation type. Where the field is advisory or diagnostic,
+use a string.
+
+And this is not a rule about home-made documents. YooKassa publishes a specification — and it is wrong
+too. An official document tells you about its provenance, not about its truthfulness.
 
 ## What this API gets right
 
 **Idempotency works exactly as documented.** Re-posting `claims/create` with the same `request_id`
-returns the same claim, in whatever state it has reached, rather than creating a second one. That is the
-recovery mechanism the whole mutating test suite relies on, and it is the one promise in the reference
-that held without qualification. It is also, pleasingly, the subject of the best Russian-language
-article on the topic, ["Intern Vasya and his stories about API idempotency"](https://habr.com/ru/companies/yandex/articles/442762/) —
-published on Yandex's own blog. The institutional knowledge is in the building.
+returns the same claim in whatever state it has reached rather than creating a second one. The whole
+mutating test suite depends on it, and it is the one promise in the reference that held without
+qualification. The best Russian-language article on the subject — ["Intern Vasya and his stories about
+API idempotency"](https://habr.com/ru/companies/yandex/articles/442762/) — is published on Yandex's own
+blog. The knowledge is in the building.
 
-**The reference is real progress.** Compared with what I transcribed in 2025, today's pages carry
-patterns, enums, entity definitions and per-operation status codes. The `return` point is documented.
-Somebody made this better.
+**The reference is real progress.** Today's pages carry patterns, enumerations, entity definitions and
+per-operation status codes; the automatically added return point, which you previously could only learn
+about from a response, is now described.
 
-**The engineering behind the service is strong**, and Yandex writes about it well — their piece on
-[how couriers are matched and assigned for same-day delivery](https://habr.com/ru/companies/yandex/articles/887484/)
-is a good read. That is precisely why the contract at the edge is worth complaining about: the hard part
-is done, and the part that is left is a YAML file and a changelog.
+**The engineering behind the service is strong**, and Yandex writes about it well: [their piece on how
+couriers are found and assigned](https://habr.com/ru/companies/yandex/articles/887484/) is a good read.
+Which is exactly why the contract at the edge is worth talking about: the hard part is done, and what
+is left is a YAML file and a changelog.
+
+## Four questions I have no answer to
+
+These are not defects — they are decisions whose motivation I do not understand. Each may well have a
+story; the documentation does not show it.
+
+**1. Why are coordinates an array?** The type is `number[]`, exactly two elements, and the description
+has to explain the order: "longitude, latitude — in exactly that order". What was the third coordinate
+going to be? The price of this decision sits nearby, in the error codes of the calculation method:
+`estimating.swapped_coordinates`. An object with two named fields would make that code unnecessary —
+you cannot confuse `latitude` with `longitude`, but you can certainly confuse `[0]` with `[1]`.
+
+**2. Why that pattern for money?** The string is explicable. Four decimal places for roubles and
+kopecks, and an accepted `"1449."`, are not a decision — they are a pattern nobody re-read.
+
+**3. Why `int64` for an identifier that lives until the end of the request?** `point_id` is documented
+as "integer point identifier (int64), unique within one claim creation", and in the examples it is `1`
+and `2`. Nineteen significant digits for a quantity that in practice does not exceed one hand. *(For
+the record: `cargo_loaders` is a plain `integer` in both documents, not an `int64` — I checked, because
+I was about to complain about that too.)*
+
+**4. Why two timestamp formats in one response?** If microseconds matter for the start of an interval,
+why do they not matter for its end? And if they do not matter, why are they there? One format would
+remove the guesswork with formatters; canonical ISO 8601 — with or without a fractional part — would
+also remove the questions that standard libraries keep tripping over.
 
 ## How I would have designed it
 
-None of this is original — the list overlaps with [designing quality APIs](https://habr.com/ru/companies/ruvds/articles/942916/)
-and with [ten API mistakes](https://habr.com/ru/articles/1013924/). Which is the uncomfortable part:
-nearly every item is violated by a live API from a major company.
+Nothing here is original — the list overlaps with [designing quality
+APIs](https://habr.com/ru/companies/ruvds/articles/942916/) and with [ten API
+mistakes](https://habr.com/ru/articles/1013924/). Which is the uncomfortable part: nearly every item is
+violated by a live API from a major company.
 
-Nothing in this list is specific to delivery. It is what I would want from any vendor API I have to
-integrate against, ordered by what it costs the vendor to do.
-
-1. **Publish the machine-readable document.** You have it. A link is not a project, and it converts every
-   integrator's private transcription effort into zero.
-2. **Date everything.** A generation stamp on each page, a version on the document, a changelog produced
-   from diffs. "Did this change?" should be a lookup, not an archaeology project.
-3. **One error vocabulary.** Symbolic codes, declared per operation, machine-readable specifics in a
-   structured field, no HTTP status inside the body, no parser offsets in the message.
-4. **One representation per concept.** One timestamp shape, one money scale, and if you cannot promise
-   it, document the variance instead of leaving it to be discovered.
-5. **Patterns that describe what you mean.** `{0,4}` fractional digits admits `"1449."`; you did not mean
-   that.
-6. **Deprecate in the document, not in prose.** Set the flag, add the date, state the policy, and take
-   the field out of the examples.
+1. **Publish the machine-readable document.** It exists. A link is not a project, and it turns every
+   integrator's transcription effort into zero.
+2. **Date everything.** A build stamp on the page, a version on the document, a changelog from diffs.
+3. **One error vocabulary.** Symbolic codes per operation, machine-readable specifics in a structured
+   field, no HTTP status inside the body, no parser offsets in the message.
+4. **One representation per concept.** One timestamp format, one money scale; and if you cannot promise
+   it, document the variance.
+5. **Patterns that describe what you mean.** `{0,4}` fractional digits admits `"1449."`; you did not
+   mean that.
+6. **Deprecate in the document, not in prose.** The flag, the date, the policy — and out of the
+   examples.
 7. **Separate request and response types** wherever the server assigns identifiers or adds entities.
-8. **Say what an advisory endpoint does not guarantee.** Preconditions and validity, or make it a dry run.
-9. **Write down cross-field constraints in prose**, since the schema cannot hold them.
-10. **Give integrators a sandbox with a stated difference from production** — and self-service,
-    rotatable credentials.
+8. **Say what an advisory method does not guarantee** — conditions and validity, or make it a dry run.
+9. **Write cross-field constraints in prose**, since the schema cannot hold them.
+10. **Provide a sandbox** whose differences from production are documented and minimal, and tokens that
+    rotate.
 
 ## Bottom line
 
-I built the client, it works, and the six operations of the ordering lifecycle have all been exercised
-against the real API. None of what is above stopped the project; all of it made it slower, and most of
-it was discovered in the one way that costs the most, which is by calling the thing and reading the
-bytes.
+The client is built, it works, and all six operations have been exercised against the real API. None of
+the above stopped the project; all of it slowed the project down, and most of it was discovered the
+most expensive way there is — by calling the thing and reading the response.
 
-The thread running through every item is the same one from my previous article: a contract is only worth
-what it is machine-checkable. Yandex has the document — every rendered page proves it. Publishing it
-would cost a link and would retire, at a stroke, a whole category of work that every one of their
+The thread running through every item is the one from my previous article: a contract is worth exactly
+as much as it is machine-checkable. Yandex has the document — every rendered page proves it. Publishing
+it costs a link, and it would retire at a stroke a whole category of work that every one of their
 integrators is currently doing separately, by hand, and getting slightly wrong in slightly different
-ways. I have the 2,028 lines to prove it.
+ways. I have 2,028 lines to prove it.
 
 ---
 
-*Documentation claims verified 24 August 2026. Wire observations were made against a Yandex Delivery
-**test** account in August 2026 and are dated where they appear; production behaviour may differ.*
+*Documentation claims verified 24 August 2026. Observations of real responses were made against a
+Yandex Delivery **test** account in August 2026 and are dated where they appear; production behaviour
+may differ.*
