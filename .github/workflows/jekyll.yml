@@ -3,6 +3,10 @@ name: Build and Deploy Jekyll Site
 on:
   push:
     branches: [main]
+  # Pull requests build but do not deploy, so a change to the build itself is checked
+  # before it reaches main rather than after.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -46,6 +50,7 @@ jobs:
           path: _site/
 
   deploy:
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
