@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "The Ghost of a Specification — A Close Read of Yandex Delivery's Express API, and How I'd Have Designed It"
+title: "The Ghost of a Specification — A Close Read of Yandex Delivery's Express API"
 date: 2026-08-24 09:00:00 +0000
 tags: [OpenAPI, API design, Yandex]
 lang: en
@@ -18,8 +18,8 @@ permalink: /2026/08/24/yandex-delivery-express-api/
 > and when my company asked officially, the answer was that no specification exists. So I wrote it
 > myself — 2,028 lines of YAML transcribed from HTML pages. Below is what that work and a day of live
 > calls turned up: two incompatible vocabularies of error codes, two timestamp formats in a single
-> response, a misspelled field name, and a reference that contradicts itself. Each item comes with
-> what I would have done instead. Some of the failures are mine.
+> response, a misspelled field name, and a reference that contradicts itself. Each item comes with what suggests
+> itself instead. Some of the failures are the author's own.
 
 ## Where this comes from
 
@@ -72,7 +72,7 @@ every `<a href>` on the `claims/create` page and filtered for `.json`, `.yaml`, 
 nothing. No "specification" or "download" wording in the page text either. The pages do not even
 return a `Last-Modified` header.
 
-**What I would have done.** Publish the file. It exists — there would be nothing to render these pages
+**What suggests itself.** Publish the file. It exists — there would be nothing to render these pages
 from otherwise — and serving it is a link, not a project. The moment it is downloadable, everything I
 had to build by hand becomes free for every integrator: a client in any language, a
 [Spectral](https://stoplight.io/open-source/spectral) run as an executable style guide, a
@@ -99,7 +99,7 @@ This is not an isolated habit at the vendor: [a dated audit of Yandex 360's audi
 log](https://habr.com/ru/articles/1072594/) is the same exercise against a different product, with the
 same finding.
 
-**What I would have done.** Version the document and generate the changelog from diffs between
+**What suggests itself.** Version the document and generate the changelog from diffs between
 versions — a hand-written one goes stale first, which is [exactly the argument the MTS team
 makes](https://habr.com/ru/companies/ru_mts/articles/1003562/). Failing that, stamp each page with its
 build date.
@@ -135,7 +135,7 @@ item in the article. What is worse than the typo is what the documentation does 
 
   The example teaches the mistake it documents.
 
-**What I would have done.** Keep the field — breaking integrators over spelling would be vanity. Set
+**What suggests itself.** Keep the field — breaking integrators over spelling would be vanity. Set
 `deprecated: true`, write in the description that it will not be removed and always mirrors
 `dropoff_point`, and take it out of the examples.
 
@@ -168,7 +168,7 @@ reference". That reference is eleven rows long for an API of thirty-odd methods,
 inside its own table: `unauthorized` and `inappropriate_status` are machine codes, `Internal server
 error` and `Parse error` are English sentences, all typeset identically.
 
-**What I would have done.** One vocabulary, the symbolic one. No HTTP status inside the body.
+**What suggests itself.** One vocabulary, the symbolic one. No HTTP status inside the body.
 `message` stays human and unstable; the machine-readable specifics — which field, which limit — move
 into a structured `details` object, and parser offsets never leave the building. Codes get declared per
 operation in the document, as the `offers/calculate` page already does, and the standalone error page
@@ -183,7 +183,7 @@ The error reference: "`delay_too_long` — the maximum number of days for the `d
 `Due` entity on the `claims/create` page: "by 30–240 minutes for the `express` tariff; **by five days**
 for the `cargo` tariff." Both pages are current as of 24 August 2026.
 
-I did not test which number the server enforces, deliberately: the point is not which is right, but
+Which number the server enforces was deliberately not tested: the point is not which is right, but
 that a careful reader who checks two pages ends up less certain than one who checks a single page.
 
 ## Which statuses can an operation return? Depends who you ask
@@ -209,7 +209,7 @@ undocumented response. The same goes for `500`.
 specification or drift in their documentation — whether the code appeared after I transcribed the page
 or I simply missed it, there is no way to tell, for exactly the reason in the previous section.
 
-**What I would have done.** Declare the shared failures once in `components/responses` and `$ref` them
+**What suggests itself.** Declare the shared failures once in `components/responses` and `$ref` them
 from every operation — three lines each, and a generated client gains a case for the thing that happens
 most often.
 
@@ -255,7 +255,7 @@ document gives you no basis for picking. I kept the shape the previously working
 and wrote the question down rather than "correcting" it toward symmetry — the feedback for guessing
 wrong here is not a failed test but a delivery that does not happen.
 
-**What I would have done.** One format, pinned in the field description with an example, identical in
+**What suggests itself.** One format, pinned in the field description with an example, identical in
 both directions. If the backend honestly cannot promise that, document *that*: "the fractional part may
 or may not be present" is a poor guarantee and excellent documentation.
 
@@ -276,7 +276,7 @@ digits — and the pattern allows four. And because the fractional group is `{0,
 it accepts a bare trailing dot: `"1449."` is a valid amount according to the vendor's own document. In
 a real response, one object carried `"total_price":"1449"` next to `"total_price_with_vat":"1767.78"`.
 
-**What I would have done.** Either integer minor units (`144900` kopecks — no ambiguity and no parser)
+**What suggests itself.** Either integer minor units (`144900` kopecks — no ambiguity and no parser)
 or a decimal string with a fixed scale, `^-?\d{1,14}\.\d{2}$`, with the scale stated in words. A
 pattern is a promise, and a loose one promises what you will have to support later.
 
@@ -298,7 +298,7 @@ as required. What is awkward is that in the response the same field means someth
 identifier the server assigned. One name, two things, and a client that misses the difference builds
 logic on numbers that live until the end of the request.
 
-**What I would have done.** Describe the request point and the response point as two schemas. They
+**What suggests itself.** Describe the request point and the response point as two schemas. They
 really are different types: in one the identifier was chosen by the client and will be discarded, in
 the other it was assigned by the server and must not be invented. One schema for both saves a few lines
 in the document and moves the confusion into every consumer.
@@ -315,7 +315,7 @@ Two consequences. A cancellation that fails is not necessarily one that will kee
 code should re-read the status and retry. And a method whose advice can be contradicted one call later
 needs to say so.
 
-**What I would have done.** Either give the advice conditions and a validity window — which states
+**What suggests itself.** Either give the advice conditions and a validity window — which states
 refuse cancellation regardless of price — or make it a dry run of the real operation: return exactly
 what the real call would return, minus the effect.
 
@@ -326,10 +326,10 @@ the same loaders on `cargo` with a body type and the claim is accepted. No schem
 dependency and no offline test catches it: a stub transport accepts whatever you hand it, so a request
 fixture can be wrong from the day it is written while every offline test stays green. Mine was.
 
-I cannot push this one very hard: cross-field constraints are poorly expressed in JSON Schema, and the
+There is not much to press here: cross-field constraints are poorly expressed in JSON Schema, and the
 ones that depend on tariff, region and account state cannot be expressed at all.
 
-**What I would have done.** Write them in prose, in the description of the field they constrain: "not
+**What suggests itself.** Write them in prose, in the description of the field they constrain: "not
 available with `taxi_class: express`" is one sentence that would have saved me half a day. For
 account-dependent constraints, an endpoint reporting what *this* account can order beats any amount of
 documentation — and it is one step away: `offers/calculate` already knows.
@@ -345,7 +345,7 @@ The documented behaviour is that the vendor will build a malformed URL unless yo
 end in `?` or `&`. Writing it down beats not writing it down; it does not beat parsing the URL and
 merging the query, which is a library call in any language.
 
-**What I would have done.** Merge the query properly — better still, put the payload in the body of the
+**What suggests itself.** Merge the query properly — better still, put the payload in the body of the
 POST request, where a status notification belongs, rather than in a query string that ends up in access
 logs.
 
@@ -370,8 +370,8 @@ For a Russian B2B logistics API this is ordinary, but it has a cost, and Vladimi
 precisely in ["all tests green, payments stuck"](https://habr.com/ru/articles/1050584/): without a
 sandbox that behaves like production, your test suite measures your own assumptions.
 
-**What I would have done.** Tokens with a lifetime and a rotation story. And a sandbox whose
-differences from production are, first, written down and, second, minimal: "identical to production
+**What suggests itself.** A sandbox whose differences from production are, first, written down and,
+second, minimal: "identical to production
 except that no courier is dispatched and no money moves" tells an integrator exactly how far to trust
 their green tests.
 
@@ -396,13 +396,23 @@ so the vocabulary grows with the request schema and was never closeable. I made 
 vendor claimed — though the documentation also leaves room for interpretation here, and I interpreted
 badly.
 
-The rule I took away: **a closed enumeration is an assertion checked at decode time, and when it fails
+The rule that follows is simple: **a closed enumeration is an assertion checked at decode time, and when it fails
 it takes the whole response with it.** Enumerate where the caller must handle every case and a new
 value is a real decision — tariff class, cancellation type. Where the field is advisory or diagnostic,
 use a string.
 
 And this is not a rule about home-made documents. YooKassa publishes a specification — and it is wrong
-too. An official document tells you about its provenance, not about its truthfulness.
+in places too. Its discriminator is declared such that a typed client cannot resolve a response variant:
+the base schema carries a `mapping`, but every use site inlines its own `oneOf` without one, and per the
+standard an absent `mapping` means "match the value against schema names" — so `"type": "bank_card"`
+never finds the schema actually called `PaymentMethodBankCard`. A dynamically typed client does not read
+the discriminator at all, which is how the defect reached production and stayed there. Alongside it,
+`404` is declared on `GET /payments/{payment_id}` and not on `POST /payments/{payment_id}/capture` —
+within one resource family.
+
+There is, incidentally, nowhere to report this. The document is served as a finished file, and the
+repository that assembles it is archived; the last commit is October 2021. What remains is a support
+ticket. An official document tells you about its provenance, not about its truthfulness.
 
 ## What this API gets right
 
@@ -422,10 +432,17 @@ couriers are found and assigned](https://habr.com/ru/companies/yandex/articles/8
 Which is exactly why the contract at the edge is worth talking about: the hard part is done, and what
 is left is a YAML file and a changelog.
 
-## Four questions I have no answer to
+And here is the one barb in this article. An industry that runs conferences on engineering culture,
+publishes books and talks from the stage about teams of AI agents puts out, at its edge, an error
+reference eleven rows long, a changelog three years old, and a typo that can no longer be removed.
+Inside: strong algorithms and good talks. At the boundary where the integrator lives: a facade whose
+quality nobody measures — though putting it right costs less than preparing a single talk, being one
+file and one link to it.
 
-These are not defects — they are decisions whose motivation I do not understand. Each may well have a
-story; the documentation does not show it.
+## Four questions without an answer
+
+These are not defects but decisions whose motivation the documentation does not show. Each may well
+have its own story.
 
 **1. Why are coordinates an array?** The type is `number[]`, exactly two elements, and the description
 has to explain the order: "longitude, latitude — in exactly that order". What was the third coordinate
@@ -447,7 +464,7 @@ why do they not matter for its end? And if they do not matter, why are they ther
 remove the guesswork with formatters; canonical ISO 8601 — with or without a fractional part — would
 also remove the questions that standard libraries keep tripping over.
 
-## How I would have designed it
+## What suggests itself, as a list
 
 Nothing here is original — the list overlaps with [designing quality
 APIs](https://habr.com/ru/companies/ruvds/articles/942916/) and with [ten API
@@ -468,8 +485,7 @@ violated by a live API from a major company.
 7. **Separate request and response types** wherever the server assigns identifiers or adds entities.
 8. **Say what an advisory method does not guarantee** — conditions and validity, or make it a dry run.
 9. **Write cross-field constraints in prose**, since the schema cannot hold them.
-10. **Provide a sandbox** whose differences from production are documented and minimal, and tokens that
-    rotate.
+10. **Provide a sandbox** whose differences from production are documented and minimal.
 
 ## Bottom line
 
