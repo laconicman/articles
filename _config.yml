@@ -33,6 +33,7 @@ plugins:
   - jekyll-sitemap
   - jekyll-seo-tag
   - jekyll-polyglot
+  - jekyll-redirect-from
 
 # Default Front Matter
 defaults:

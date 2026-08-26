@@ -4,9 +4,12 @@ title: "Wiki врёт, прод молчит — почему пора сдел�
 date: 2025-06-03 18:00:00 +0000
 tags: [OpenAPI]
 lang: ru
+permalink: /2025/06/03/openapi-source-of-truth/
+redirect_from:
+  - /2025/06/03/openapi-source-of-truth.ru/
 ---
 
-*[Read in English →]({{ '/2025/06/03/openapi-source-of-truth.en/' | relative_url }})*
+*[Read in English →]({{ '/en/2025/06/03/openapi-source-of-truth/' | relative_url }})*
 
 ---
 

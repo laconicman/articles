@@ -4,9 +4,10 @@ title: "Wiki Lies, Prod is Silent — Why OpenAPI Should Be the Single Source of
 date: 2025-06-03 18:00:00 +0000
 tags: [OpenAPI]
 lang: en
+permalink: /2025/06/03/openapi-source-of-truth/
 ---
 
-*This article is an English translation. [Читать оригинал на русском →]({{ '/2025/06/03/openapi-source-of-truth.ru/' | relative_url }})*
+*This article is an English translation. [Читать оригинал на русском →]({{ '/2025/06/03/openapi-source-of-truth/' | relative_url }})*
 
 ---
 
