@@ -7,33 +7,61 @@ lang: en
 permalink: /2025/06/03/openapi-source-of-truth/
 ---
 
-*This article is an English translation. [Читать оригинал на русском →]({{ '/2025/06/03/openapi-source-of-truth/' | relative_url }})*
+*<a {% static_href %}href="{{ site.baseurl }}/2025/06/03/openapi-source-of-truth/"{% endstatic_href %}>Читать оригинал на русском →</a>*
 
 ---
 
-**Note:** Full translation in progress. Below is the original Russian text.
+# Wiki lies, prod is silent: why OpenAPI should be the single source of truth for your API
 
----
+> **In short.** Some teams still keep the "truth" about their API in three incompatible places: in a
+> backend developer's head, on a Confluence page that went stale last spring, and in the actual JSON
+> that arrives from production. Those three sources drift apart constantly, and everyone pays for it —
+> client developers most of all. OpenAPI is a way to reduce the truth to a single contract file that
+> humans and machines read alike. This article covers why that is worth doing, why code generation is
+> far from the main reason, what adoption actually costs the backend, and where the approach is
+> genuinely weak.
 
-# Вики врёт, прод молчит: почему пора сделать OpenAPI единственным источником правды о вашем API
+## Where the pain comes from
 
-> **Короткая суть.** Некоторые команды до сих пор хранят «правду» об API в трёх несовместимых местах: в голове бэкендера, в страничке Confluence, которая устарела ещё прошлой весной, и в реальном JSON, который прилетает с прода. Эти три источника постоянно расходятся, и расплачиваются за это все — особенно клиентские разработчики. OpenAPI — это способ свести правду к одному файлу-контракту, понятному и человеку, и машине. В статье я разбираю, зачем это нужно, почему кодогенерация — далеко не главная причина, но при этом проговариваю, во что внедрение обойдётся бэкенду, и где у подхода реальные слабые места.
+I am a mobile developer. Working with data structures, I sometimes look at an endpoint, go to the wiki,
+find the page describing it — and do not believe it. Because experience says the page describes the API
+as it was intended six months ago, not as it is now. Then the familiar ritual begins: I message a
+backend developer, they answer "check Swagger", Swagger is generated from annotations and shows an
+approximate picture, and the real response differs from it because the serialisation rule lives in one
+place and the description-generating rule in another. In the end I do what most client developers do: I
+call the endpoint for real, look at the actual JSON, and believe only that.
 
-## Откуда боль
+This is the source-of-truth problem. We do not have one source, we have several, and they compete. The
+wiki is intent. The backend code is implementation. Real traffic is fact. And when they diverge — which
+they always do — the cost of the mistake lands first on the API's consumers: on the frontend, on iOS, on
+Android, on desktop, on external integrators.
 
-Я мобильный разработчик. Иногда при работе со структурами данных я рассматриваю endpoint-ы, иду в вики, нахожу страницу с описанием — и не верю ей. Потому что по опыту знаю: страница описывает API таким, каким он был задуман полгода назад, а не таким, какой он сейчас. Дальше начинается знакомый ритуал: пишу в чат бэкендеру, он отвечает «глянь в сваггере», сваггер сгенерирован из аннотаций и показывает приблизительную картину, реальный ответ с сервера от неё отличается, потому что правило сериализации живёт в одном месте, а правило генерации описания — в другом. В итоге я делаю то, что делает большинство клиентских разработчиков: дёргаю endpoint «вживую», смотрю реальный JSON и верю только ему.
+Plenty of people have described this pain. Alexey, a Java developer at YooMoney, puts it bluntly in his
+article on improving server-to-server interaction: Swagger UI generated automatically from class
+metadata shows only a rough description of what the API really returns, so frontend and mobile
+developers cannot start work without calling the endpoint live. This is not somebody's personal
+sloppiness — it is a structural flaw in a process where the truth is not centralised.
 
-Это и есть проблема источника правды. У нас не один источник, а несколько, и они конкурируют. Вики — это намерение. Код бэкенда — это реализация. Реальный трафик — это факт. И когда между ними возникает расхождение (а оно возникает всегда), цена ошибки ложится в первую очередь на потребителя API: на фронтенд, на iOS, на Android, на десктоп, на внешних интеграторов.
+## What OpenAPI is (for those who have not run into it)
 
-Эту боль на Habr описывали многие. Алексей, Java-разработчик ЮMoney, в статье «Как улучшить межсерверное взаимодействие и сэкономить время разработчика» формулирует её предельно прямо: «Swagger UI, который генерируется автоматом по метаданным классов, показывает очень примерное описание того, что у нас реально отдаётся из API. Поэтому фронты и мобильные разработчики не могут начать разработку, не вызвав endpoint на живую». Это не чья-то личная неаккуратность — это структурный изъян процесса, в котором правда не централизована.
+OpenAPI is an open standard for describing HTTP APIs — primarily REST-style ones — in a machine-readable
+form. It is worth drawing the boundary immediately: OpenAPI is not the only contract language and does
+not cover every protocol. For strictly typed inter-service communication there is gRPC with Protobuf;
+for APIs with flexible queries, GraphQL with its own type system; for event-driven and broker
+architectures (Kafka, message queues), the related AsyncAPI standard. OpenAPI occupies the REST/HTTP
+niche — and there, where most client-server APIs of mobile products live, it has become the de facto
+standard. It used to be called Swagger; in the mid-2010s the specification was handed to the OpenAPI
+Initiative (a body under the Linux Foundation, founded by companies including Google, IBM, Microsoft,
+PayPal and SmartBear), and today Swagger is a set of tools around the standard (Swagger UI, Swagger
+Editor and so on) while the format itself is called the OpenAPI Specification.
 
-## Что такое OpenAPI (для тех, кто ещё не сталкивался)
+Technically it is a single file — usually YAML, occasionally JSON — describing everything you need to
+know about a REST API: which paths exist, which methods they have, which parameters and request bodies
+they accept, which response codes and data schemas they return, and how authentication works. The format
+is not the point; the idea is: one document that humans and tools read the same way.
 
-OpenAPI — это открытый стандарт описания HTTP-API (прежде всего в REST-стиле) в машиночитаемом виде. Стоит сразу очертить границу: OpenAPI — не единственный язык контрактов и покрывает не любой протокол. Для строго типизированного межсервисного взаимодействия есть gRPC с Protobuf, для API с гибкими запросами — GraphQL со своей системой типов, для событийных и брокерных архитектур (Kafka, очереди сообщений) — родственный стандарт AsyncAPI. OpenAPI же занимает нишу REST/HTTP — и именно здесь, где живёт большинство клиент-серверных API мобильных продуктов, он стал де-факто стандартом. Раньше он назывался Swagger; в середине 2010-х спецификацию передали под управление OpenAPI Initiative (объединение под крылом Linux Foundation, учреждённое такими компаниями, как Google, IBM, Microsoft, PayPal, SmartBear и другими), и сегодня Swagger — это уже набор инструментов вокруг стандарта (Swagger UI, Swagger Editor и прочие), а сам формат называется OpenAPI Specification.
-
-Технически это один файл (обычно YAML, реже JSON), в котором описано всё, что нужно знать о REST API: какие есть пути (endpoints), какие у них методы, какие параметры и тела запросов они принимают, какие коды ответов и какие схемы данных возвращают, как устроена аутентификация. Главное здесь не формат, а идея: один документ, который одинаково читают и человек, и инструменты.
-
-Вот как выглядит описание одного простого endpoint — сервис, который возвращает задачу по идентификатору:
+Here is what describing a single simple endpoint looks like — a service returning a task by its
+identifier:
 
 ```yaml
 openapi: 3.1.0
@@ -44,7 +72,7 @@ paths:
   /tasks/{taskId}:
     get:
       operationId: getTask
-      summary: Получить задачу по идентификатору
+      summary: Get a task by its identifier
       parameters:
         - name: taskId
           in: path
@@ -53,13 +81,13 @@ paths:
             type: string
       responses:
         '200':
-          description: Задача найдена
+          description: Task found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Task'
         '404':
-          description: Задача не найдена
+          description: Task not found
 components:
   schemas:
     Task:
@@ -74,21 +102,35 @@ components:
           type: boolean
 ```
 
-Это читается практически без подготовки: есть путь `/tasks/{taskId}`, он принимает идентификатор в path, отдаёт либо `200` с объектом `Task`, либо `404`. И — ключевой момент — этот же самый текст читают и человек, и машина: то, что вы сейчас разобрали глазами без подготовки, инструмент разбирает программно. Один файл, одна правда — и для людей, и для кода.
+This reads with almost no preparation: there is a path `/tasks/{taskId}`, it takes an identifier in the
+path, and it returns either `200` with a `Task` object or `404`. And — this is the key point — the very
+same text is read by a human and by a machine: what you just parsed by eye without preparation, a tool
+parses programmatically. One file, one truth, for people and for code alike.
 
-### Переиспользование вместо копипасты: DRY в описании API
+### Reuse instead of copy-paste: DRY in an API description
 
-Прежде чем идти дальше, стоит отдельно показать свойство, которое в ручной документации почти недостижимо, а в OpenAPI даётся даром: переиспользование. Это, на мой взгляд, один из самых недооценённых аргументов, поэтому остановлюсь на нём подробно.
+Before going further, it is worth showing a property that is nearly unattainable in hand-written
+documentation and comes free with OpenAPI: reuse. To my mind this is one of the most underrated
+arguments, so I will dwell on it.
 
-**Схемы данных описываются один раз.** В вики-документации одна и та же структура (скажем, объект пользователя или стандартный конверт ошибки) расползается по десяткам endpoints, и каждое описание живёт своей жизнью. Кто-то поправил поле в одном месте и забыл в пяти других — и вот документация уже противоречит сама себе. В OpenAPI структура описывается единожды в `components/schemas`, а везде дальше подставляется через `$ref`. Поправили в одном месте — изменилось везде. Рассогласование внутри самого контракта становится структурно невозможным.
+**Data schemas are described once.** In wiki documentation the same structure — say a user object or a
+standard error envelope — spreads across dozens of endpoints, and each description lives its own life.
+Somebody fixes a field in one place and forgets five others, and now the documentation contradicts
+itself. In OpenAPI the structure is described once in `components/schemas` and referenced everywhere
+else through `$ref`. Fix it in one place and it changes everywhere. Inconsistency inside the contract
+becomes structurally impossible.
 
-**Разные варианты ответов описываются кратко и переиспользуют общее.** Endpoint редко отдаёт один-единственный вид ответа: есть `200`, есть `400`, `404`, `409`, и у ошибок обычно общая структура. В ручном описании это превращается в портянку, где конверт ошибки переписан для каждого кода заново. В OpenAPI все ошибочные ответы ссылаются на одну схему, а для «всех прочих кодов» есть `default`. Плюс наследование схем через `allOf`: общую часть нескольких родственных типов описывают один раз, а частные случаи её наследуют — тот самый DRY на уровне данных. Важная оговорка на будущее: `allOf` — это именно наследование, а не полиморфизм, и это спокойный, предсказуемый случай — он и описывается элегантно, и отображается генераторами в код без сюрпризов. С полиморфными union-типами (`oneOf`/`anyOf`) дело обстоит иначе, но о них речь пойдёт в разделе про недостатки.
+**Different response variants are described briefly and share common parts.** An endpoint rarely returns
+a single kind of response: there is `200`, there is `400`, `404`, `409`, and errors usually share a
+structure. In a hand-written description that turns into a wall of text where the error structure is
+rewritten for every code. In OpenAPI all error responses reference one schema, and there is `default`
+for "everything else". Plus schema inheritance through `allOf`: the shared part of several related types
+is described once and the special cases inherit it — DRY at the level of data. An important caveat for
+later: `allOf` is inheritance, not polymorphism, and it is the calm, predictable case — elegant to
+describe and mapped into code by generators without surprises. Polymorphic union types (`oneOf`/`anyOf`)
+are a different story, but they belong in the section on drawbacks.
 
-**Примеры тоже переиспользуются.** Хорошо написанный пример ответа (`examples`) можно вынести в `components` и ссылаться на него отовсюду, где он уместен — из документации, из mock-сервера, из тестов. Один аккуратный пример работает сразу на нескольких потребителей, а не дублируется в каждом.
-
-Посмотрите, как компактно это выглядит на практике:
-
-yaml
+Look how compact this is in practice:
 
 ```yaml
 paths:
@@ -96,21 +138,21 @@ paths:
     get:
       operationId: getTask
       parameters:
-        - $ref: '#/components/parameters/TaskId'   # параметр описан один раз
+        - $ref: '#/components/parameters/TaskId'   # the parameter is described once
       responses:
         '200':
-          description: Задача найдена
+          description: Task found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Task'
               examples:
                 sample:
-                  $ref: '#/components/examples/TaskSample'  # пример переиспользуется
+                  $ref: '#/components/examples/TaskSample'  # the example is reused
         '404':
-          $ref: '#/components/responses/NotFound'   # общий ответ об ошибке
+          $ref: '#/components/responses/NotFound'   # a shared error response
         default:
-          $ref: '#/components/responses/Error'       # всё прочее — одной строкой
+          $ref: '#/components/responses/Error'      # everything else, in one line
 
 components:
   parameters:
@@ -122,19 +164,19 @@ components:
         type: string
   responses:
     NotFound:
-      description: Не найдено
+      description: Not found
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'   # та же схема ошибки
+            $ref: '#/components/schemas/Error'   # the same error schema
     Error:
-      description: Ошибка
+      description: Error
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
-    Error:                       # конверт ошибки описан ровно один раз
+    Error:                       # the error structure is described exactly once
       type: object
       required: [code, message]
       properties:
@@ -143,7 +185,7 @@ components:
         message:
           type: string
     Task:
-      allOf:                     # наследование: общее описано один раз
+      allOf:                     # inheritance: the shared part is described once
         - $ref: '#/components/schemas/Entity'
         - type: object
           required: [title, done]
@@ -152,7 +194,7 @@ components:
               type: string
             done:
               type: boolean
-    Entity:                      # базовые поля, общие для многих сущностей
+    Entity:                      # base fields shared by many entities
       type: object
       required: [id]
       properties:
@@ -162,28 +204,57 @@ components:
     TaskSample:
       value:
         id: "42"
-        title: "Купить молоко"
+        title: "Buy milk"
         done: false
 ```
 
-Здесь нет ни одного повторно описанного фрагмента: параметр, схема ошибки, конверт ответа, базовые поля сущности и пример — каждый существует в единственном экземпляре, а endpoints на них ссылаются. В ручной документации ровно эти вещи копируются снова и снова и именно в этом копировании и накапливается рассинхрон.
+Not a single fragment here is described twice: the parameter, the error schema, the response structure,
+the entity's base fields and the example each exist in exactly one copy, and the endpoints reference
+them. In hand-written documentation these are precisely the things that get copied again and again, and
+it is in that copying that the drift accumulates.
 
-И ещё одно — на случай распространённого предубеждения, что «REST — это про старомодные «запрос-ответ», а всё современное мимо“». Это не так. Современные версии OpenAPI умеют описывать и потоковые (streaming) ответы — те самые, по которым ответ приходит не одним куском, а постепенно, по мере генерации. Самый узнаваемый сегодня пример — общение с AI-чат-ботами, где текст «печатается» на экране по мере поступления токенов (как правило, через Server-Sent Events). Такие интерфейсы OpenAPI описывает наравне с обычными, а инструменты их поддерживают: например, официальный swift-openapi-generator умеет отдавать тело потокового ответа как `AsyncSequence` — то есть сгенерированный клиент выдаёт поток, который на стороне Swift обрабатывается родным `for try await`. Так что контракт-первый подход не запирает вас в парадигме прошлого десятилетия: он покрывает и то, что вы пишете прямо сейчас, интегрируя очередную LLM.
+And one more thing, against a common prejudice that "REST is old-fashioned request-response and
+everything modern is elsewhere". It is not so. Modern versions of OpenAPI can describe streaming
+responses too — the ones where the answer arrives progressively rather than in one piece. The most
+recognisable example today is talking to AI chatbots, where text is "typed" onto the screen as tokens
+arrive (usually over Server-Sent Events). OpenAPI describes such interfaces alongside ordinary ones, and
+tools support them: the official swift-openapi-generator can hand you a streaming response body as an
+`AsyncSequence` — that is, the generated client produces a stream that Swift handles with a native
+`for try await`. So a contract-first approach does not lock you into the paradigm of the previous
+decade: it covers what you are writing right now, while integrating yet another LLM.
 
 ---
-## Идея единственного источника правды
+## The single-source-of-truth idea
 
-Весь смысл подхода в одной фразе: спецификация перестаёт быть документацией и становится контрактом. С контрактом обращаются так же строго, как с кодом: он лежит в системе контроля версий, к нему пишут pull request'ы, его ревьюят, его версионируют по SemVer. Любое изменение API начинается с изменения спецификации, а не с правки кода и последующего «не забыть обновить вики».
+The whole point of the approach fits in one sentence: the specification stops being documentation and
+becomes a contract. A contract is handled as strictly as code: it lives in version control, it gets pull
+requests, it is reviewed, it is versioned with SemVer. Any change to the API starts with a change to the
+specification, not with a code edit and a subsequent "don't forget to update the wiki".
 
-В русскоязычных кейсах это формулируют по-разному — Contract-First, Design-First, Specification-First, Manifest-First, — но суть одна: сначала контракт, потом код. И тут важно сразу снять одно недоразумение. Существует и обратный подход — генерировать спецификацию из кода (code-first, через аннотации). Он кажется дешевле, но воспроизводит ровно ту проблему, с которой мы начали: спецификация остаётся вторичным, побочным продуктом, который отстаёт от реальности. Матвей Лихота из МТС Web Services в своём разборе формулирует это так: «документация, которую пишут руками отдельно от кода, устаревает уже в момент следующего коммита» — и именно поэтому его команда развернула процесс и сделала спецификацию первичной.
+Russian-language case studies name it variously — Contract-First, Design-First, Specification-First,
+Manifest-First — but the essence is the same: contract first, code second. And one misunderstanding is
+worth clearing up immediately. The opposite approach exists too: generating the specification from code,
+through annotations (code-first). It looks cheaper, but it reproduces exactly the problem we started
+with: the specification stays a secondary, by-product artefact that lags behind reality. Matvey Likhota
+of MTS Web Services puts it this way in his write-up: documentation written by hand separately from the
+code goes stale at the very next commit — which is precisely why his team inverted the process and made
+the specification primary.
 
-Когда контракт первичен, у него появляется свойство, которого нет ни у вики, ни у головы бэкендера: он одновременно является и человекочитаемой документацией, и входными данными для целого зоопарка инструментов. И вот тут начинается самое интересное.
+When the contract is primary, it acquires a property that neither the wiki nor a backend developer's
+head has: it is simultaneously human-readable documentation and input data for a whole zoo of tools. And
+this is where it gets interesting.
 
-## Кодогенерация: полезно, но это не главное
+## Code generation: useful, but not the point
 
-Первое, о чём вспоминают при слове OpenAPI, — это кодогенерация: из спецификации можно сгенерировать клиентский и серверный код. Для клиентского разработчика это означает, что не нужно руками писать модели данных, парсинг, сетевой слой — всё это берётся из контракта и всегда ему соответствует.
+The first thing people think of at the word OpenAPI is code generation: client and server code can be
+generated from the specification. For a client developer that means not writing data models, parsing and
+a networking layer by hand — all of it comes from the contract and always matches it.
 
-Поскольку я пишу под Apple-платформы, мне ближе всего история со Swift. У Apple есть официальный swift-openapi-generator — это плагин для пакетного менеджера, который генерирует код прямо на этапе сборки. Это важная деталь: сгенерированный код не нужно коммитить в репозиторий, он всегда пересобирается из актуальной спецификации, а значит физически не может «разъехаться» с контрактом. Выглядит вызов сгенерированного клиента примерно так:
+Since I write for Apple platforms, the Swift story is closest to me. Apple has an official
+swift-openapi-generator — a package-manager plugin that generates code at build time. That detail
+matters: the generated code does not need to be committed, it is always rebuilt from the current
+specification, and therefore physically cannot drift from the contract. Calling the generated client
+looks roughly like this:
 
 ```swift
 let client = Client(
@@ -198,85 +269,221 @@ case .ok(let ok):
     let task = try ok.body.json
     print(task.title)
 case .notFound:
-    print("Задача не найдена")
+    print("Task not found")
 }
 ```
 
-Обратите внимание: и метод `getTask`, и разбор ответа на случаи `.ok` / `.notFound` — это не то, что я писал руками, это сгенерировано из той самой YAML-спецификации выше. Компилятор теперь на моей стороне: если бэкенд изменит контракт, у меня просто перестанет собираться код в нужном месте, а не «упадёт в рантайме у части пользователей».
+Note that neither the `getTask` method nor the `.ok` / `.notFound` breakdown of the response is
+something I wrote by hand — it is generated from that same YAML specification above. The compiler is now
+on my side: if the backend changes the contract, my code simply stops compiling in the right place
+instead of "crashing at runtime for some of the users".
 
-Кроме официального генератора в Swift-экосистеме есть и сторонние инструменты — например, проекты, оптимизированные под лёгкий сетевой клиент. Под Kotlin/Android и десктоп есть свои генераторы, а у Microsoft — отдельный кросс-языковой генератор клиентов Kiota, плюс есть инструменты, заточенные под .NET (NSwag). То есть из одного контракта команда может генерировать клиентов сразу под все платформы — ровно об этом рассказывают в кейсах ЮMoney, где из одной спецификации получают код и для iOS, и для Android.
+Besides the official generator, the Swift ecosystem has third-party tools — for instance projects
+optimised for a lightweight networking client. Kotlin/Android and desktop have their own generators,
+Microsoft has the cross-language client generator Kiota, and there are .NET-focused tools (NSwag). So
+from one contract a team can generate clients for every platform at once — which is exactly what the
+YooMoney case studies describe, where one specification yields code for both iOS and Android.
 
-Но вот что я хочу подчеркнуть, и это, на мой взгляд, главная мысль статьи: кодогенерация — это приятный бонус, а не причина внедрять OpenAPI. У сгенерированного кода есть своя цена (об этом ниже), и если бы всё сводилось только к ней, спорить о подходе было бы куда сложнее. Настоящая ценность контракта — в том, что он включает целую экосистему инструментов, которые работают, даже если вы не сгенерируете ни строчки кода.
+But here is what I want to emphasise, and to my mind it is the main idea of this article: code
+generation is a pleasant bonus, not a reason to adopt OpenAPI. Generated code has its own cost (more on
+that below), and if everything came down to it, the approach would be much harder to argue for. The real
+value of a contract is that it switches on an entire ecosystem of tools that work even if you never
+generate a single line of code.
 
-## Главный аргумент: выгоды, не связанные с кодогенерацией
+## The main argument: benefits that have nothing to do with code generation
 
-Вот здесь, на мой взгляд, и лежит настоящий ответ на вопрос «зачем нам это». Перечислю по порядку.
+This, I think, is where the real answer to "why do we need this" lies. In order:
 
-**Линтинг и единый стиль API.** Контракт можно автоматически проверять линтером — самый известный инструмент здесь Spectral, есть и альтернативы вроде Redocly CLI и Vacuum. Линтер следит, чтобы все endpoints были в одном стиле, чтобы у операций были описания и идентификаторы, чтобы соблюдались внутренние конвенции и правила безопасности. Это превращает абстрактный «гайд по оформлению API» в исполняемое правило, которое срабатывает в CI, а не живёт в забытой вики-странице.
+**Linting and a consistent API style.** A contract can be checked automatically by a linter — the
+best-known tool being Spectral, with alternatives such as Redocly CLI and Vacuum. The linter makes sure
+all endpoints follow one style, that operations have descriptions and identifiers, that internal
+conventions and security rules are respected. It turns an abstract "API style guide" into an executable
+rule that fires in CI rather than living on a forgotten wiki page.
 
-**Mock-сервер из коробки.** По спецификации можно поднять mock-сервер — например, через Prism. Это значит, что клиентский разработчик может начать работу до того, как бэкенд напишет хоть строчку реализации: mock отдаёт ответы, соответствующие контракту. Фронтенд и бэкенд работают параллельно, а не по очереди. Для меня как мобильного разработчика это, возможно, самый недооценённый пункт: я перестаю быть в хвосте очереди.
+**A mock server out of the box.** A specification can back a mock server — through Prism, for example.
+That means a client developer can start work before the backend has written a single line of
+implementation: the mock returns responses conforming to the contract. Frontend and backend work in
+parallel rather than in sequence. For me as a mobile developer this is possibly the most underrated
+item: I stop being at the end of the queue.
 
-**Контрактное тестирование.** Тот же Prism умеет работать в режиме прокси: он пропускает реальный трафик через себя и сверяет и запросы, и ответы с контрактом, сообщая о любых расхождениях. Это и есть та самая защита от дрейфа: если реальный сервер начал отдавать не то, что обещано в спецификации, вы узнаёте об этом в тестах, а не от рассерженных пользователей. Для более глубокого тестирования есть инструменты, генерирующие тест-кейсы прямо из контракта (например, Schemathesis).
+**Contract testing.** The same Prism can run as a proxy: it passes real traffic through itself and
+checks both requests and responses against the contract, reporting any divergence. That is the
+protection against drift: if the real server has started returning something other than what the
+specification promises, you learn it from tests rather than from angry users. For deeper testing there
+are tools that generate test cases straight from the contract (Schemathesis, for instance).
 
-**Документация, которая не врёт.** Из спецификации генерируется красивая интерактивная документация — например, через Redoc/Redocly или Swagger UI. Но в отличие от вики, эта документация не может устареть: она порождается из того же контракта, который является источником правды. Расхождение между документацией и «правдой» становится структурно невозможным.
+**Documentation that does not lie.** The specification generates good interactive documentation — via
+Redoc/Redocly or Swagger UI. Unlike a wiki, that documentation cannot go stale: it is produced from the
+same contract that is the source of truth. Divergence between documentation and "the truth" becomes
+structurally impossible.
 
-**Обнаружение breaking changes.** Это отдельный, очень важный для потребителя пункт. Инструмент oasdiff сравнивает две версии спецификации и говорит, какие изменения ломают обратную совместимость, а какие безопасны. Его можно встроить в CI и блокировать pull request, который незаметно ломает клиентов. Для мобильной разработки, где старые версии приложения живут на устройствах пользователей месяцами, это критично: breaking change в API — это не абстракция, это упавшее приложение у человека, который не обновился.
+**Breaking-change detection.** This is a separate and, for a consumer, very important point. The oasdiff
+tool compares two versions of a specification and tells you which changes break backward compatibility
+and which are safe. It can be wired into CI to block a pull request that quietly breaks clients. For
+mobile development, where old versions of an app live on users' devices for months, this is critical: a
+breaking change in an API is not an abstraction, it is a crashed app belonging to somebody who did not
+update.
 
-**Реверс-инжиниринг существующих API.** А что, если спецификации нет, а API уже работает? Тоже не тупик. Есть инструменты, которые строят черновик OpenAPI из наблюдаемого трафика — расширения для браузера, которые слушают сетевые запросы (openapi-devtools), и утилиты, конвертирующие перехваченный трафик или коллекции Postman в спецификацию (mitmproxy2swagger, postman2openapi). Это позволяет «догнать» design-first даже на легаси.
+**Reverse-engineering existing APIs.** What if there is no specification and the API already works? Not
+a dead end either. There are tools that build a draft OpenAPI document from observed traffic — browser
+extensions that listen to network requests (openapi-devtools) and utilities converting captured traffic
+or Postman collections into a specification (mitmproxy2swagger, postman2openapi). That lets you catch up
+to design-first even on legacy.
 
-**Overlays — аккуратная модификация без правки оригинала.** Отдельный стандарт OpenAPI Overlays позволяет накладывать на спецификацию изменения, не трогая исходник: добавить описания, скрыть внутренние endpoints перед публикацией наружу, подставить разные серверные URL для разных окружений. Это удобно, когда исходный контракт генерируется или поддерживается другой командой.
+**Overlays — careful modification without touching the original.** A separate OpenAPI Overlays standard
+lets you apply changes on top of a specification without editing the source: add descriptions, hide
+internal endpoints before publishing externally, substitute different server URLs for different
+environments. Useful when the source contract is generated or maintained by another team.
 
-**AI и MCP.** Свежий пласт: по спецификации можно автоматически поднять MCP-сервер (Model Context Protocol) — например, через инструмент emcee, — и тогда AI-агент сможет ходить в ваш API как в набор инструментов. Контракт здесь снова работает как универсальный адаптер: то, что описано один раз, переиспользуется и людьми, и машинами, и языковыми моделями.
+**AI and MCP.** A fresh layer: a specification can automatically back an MCP (Model Context Protocol)
+server — through a tool such as emcee — after which an AI agent can use your API as a set of tools. The
+contract works once again as a universal adapter: what is described once gets reused by people, by
+machines and by language models.
 
-**Редакторы и инструменты дизайна.** Работать с контрактом локально стало удобно. Главный инструмент здесь — плагин OpenAPI (Swagger) Editor от 42Crunch для VS Code: он даёт практически то же, что онлайновый Swagger Editor, но локально — рендеренный preview документации (через Swagger UI или ReDoc), автодополнение (IntelliSense), навигацию по ссылкам, переход к определению и встроенный линтинг. Базовый редактор бесплатный и не требует регистрации; есть и более тяжёлые возможности аудита безопасности, часть из которых требует регистрации. Рядом стоит назвать ещё несколько инструментов: расширение Redocly OpenAPI для VS Code (валидация, навигация по `$ref` и preview документации — правда, для preview нужен ключ Redocly); Stoplight Studio — визуальный редактор спецификаций со встроенным mock-сервером на Prism; Insomnia от Kong — клиент с нативным OpenAPI-редактором и live-preview, локальным хранением и линтингом через Inso CLI; и Apidog — интегрированная платформа, которая объединяет дизайн, отладку, mock и тестирование API в одном месте. Здесь стоит честно разделить локальное и облачное: VS Code-плагины 42Crunch и Redocly, а также Stoplight Studio работают локально; Insomnia умеет хранить данные полностью локально (Local Vault); Apidog же — в основе своей облачная платформа, и это нужно учитывать командам с требованиями к хранению данных.
+**Editors and design tools.** Working with a contract locally has become convenient. The main tool here
+is the OpenAPI (Swagger) Editor plugin from 42Crunch for VS Code: it gives you practically what the
+online Swagger Editor does, but locally — rendered documentation preview (through Swagger UI or ReDoc),
+autocompletion (IntelliSense), navigation through references, go-to-definition and built-in linting. The
+basic editor is free and requires no registration; there are heavier security-audit capabilities, some
+of which do. Alongside it, several other tools are worth naming: the Redocly OpenAPI extension for VS
+Code (validation, `$ref` navigation and documentation preview — though preview needs a Redocly key);
+Stoplight Studio, a visual specification editor with a built-in Prism mock server; Insomnia by Kong, a
+client with a native OpenAPI editor and live preview, local storage and linting through the Inso CLI;
+and Apidog, an integrated platform combining design, debugging, mocking and testing in one place. It is
+worth separating local from cloud here honestly: the 42Crunch and Redocly VS Code plugins and Stoplight
+Studio work locally; Insomnia can store data entirely locally (Local Vault); Apidog is fundamentally a
+cloud platform, which teams with data-residency requirements need to take into account.
 
-Обратите внимание: ни один из этих пунктов не требует генерации кода. Даже если ваша команда принципиально пишет весь сетевой слой руками, вы всё равно получаете линтинг, моки, контрактные тесты, честную документацию и защиту от breaking changes. Вот почему я считаю, что спор «генерировать код или нет» — вторичен по отношению к решению «иметь контракт или нет».
+Note that not one of these items requires code generation. Even if your team writes every line of the
+networking layer by hand, you still get linting, mocks, contract tests, honest documentation and
+protection from breaking changes. That is why I consider the "generate code or not" argument secondary
+to the decision "have a contract or not".
 
-## Честно о недостатках
+## Honestly about the drawbacks
 
-Я обещал апологию в классическом смысле — то есть защиту, которая не прячет неудобные факты. Вот они.
+I promised an apologia in the classical sense — a defence that does not hide the inconvenient facts.
+Here they are.
 
-****Полиморфизм и дискриминаторы — это больно (но реже, чем кажется).** Сначала о масштабе. Подавляющее большинство типов в реальной спецификации — это простые плоские структуры, переиспользуемые через `$ref`; для них кодогенерация и весь остальной инструментарий работают безупречно. Наследование через `allOf`, которое мы только что хвалили за DRY, генераторы тоже, как правило, переваривают без сюрпризов. И сам `allOf`, и — тем более — полиморфизм с дискриминатором встречаются в живых контрактах заметно реже простых подтипов. Боль начинается именно с полиморфных «или-или» типов — когда объект может быть _одним из_ нескольких вариантов (`oneOf`/`anyOf` с дискриминатором): вот здесь генераторы ведут себя по-разному и нередко выдают неуклюжий код.На Habr есть детальный разбор именно этой боли в контексте Java/Spring (статья «Генерация контрактов OpenApi или прикладной API first: oneOf, anyOf, allOf»): дискриминатор там описан как «именно та вещь, которая позволяет управлять генерацией кода при использовании полиморфизма», и он превращается в специальные Java-аннотации `@JsonSubTypes`. Вывод честный: дискриминатор работает, но требует аккуратности и понимания, как именно ваш генератор отображает полиморфизм в код. На клиенте история похожая. Это реальное ограничение — но, как я и сказал, скорее редкий угол, чем ежедневная преграда: для большинства endpoints вы его попросту не встретите.
+**Polymorphism and discriminators hurt (but less often than you would think).** First, the scale. The
+overwhelming majority of types in a real specification are simple flat structures reused through `$ref`;
+for them, code generation and the rest of the tooling work flawlessly. Inheritance through `allOf`,
+which we just praised for DRY, is usually digested by generators without surprises too. And both `allOf`
+and — even more so — polymorphism with a discriminator appear in live contracts noticeably less often
+than simple subtypes. The pain begins precisely with polymorphic "either-or" types, where an object can
+be *one of* several variants (`oneOf`/`anyOf` with a discriminator): here generators behave differently
+and often emit clumsy code. Habr has a detailed analysis of exactly this pain in a Java/Spring context
+(the article on generating OpenAPI contracts and `oneOf`, `anyOf`, `allOf`): the discriminator is
+described there as the thing that lets you control code generation when using polymorphism, and it turns
+into specific Java annotations, `@JsonSubTypes`. The conclusion is honest: discriminators work, but they
+require care and an understanding of how exactly your generator maps polymorphism into code. On the
+client the story is similar. This is a genuine limitation — but, as I said, more of a rare corner than a
+daily obstacle: for most endpoints you will simply not meet it.
 
-**Эргономика сгенерированного кода.** Сгенерированный код почти всегда объёмнее и менее «родной», чем написанный руками. Имена в спецификации напрямую превращаются в имена в коде — «кривой нейминг в спеке означает кривой нейминг в коде». Некоторые генераторы спотыкаются на анонимных объектах и нестандартных конструкциях. Официальный swift-openapi-generator на Habr уже получил скептический обзор от iOS-команды Ozon: Андрей, разработчик приложения «Пункт Ozon», в статье «Готов ли Swift OpenAPI Generator для продуктивного кода?» жалуется на «невозможность повлиять на процесс генерации» и на очень долгую сборку зависимостей — у него пустой проект собирался около 105 секунд на MacBook Pro M1. С тех пор инструмент заметно повзрослел, но сам факт показателен: к выбору генератора нужно подходить трезво и проверять результат на своём реальном контракте, а не на учебном примере с котиками.
+**The ergonomics of generated code.** Generated code is almost always bulkier and less "native" than
+hand-written code. Names in the specification turn directly into names in the code — crooked naming in
+the spec means crooked naming in the code. Some generators stumble over anonymous objects and
+non-standard constructs. The official swift-openapi-generator has already had a sceptical review on
+Habr from Ozon's iOS team: Andrey, a developer on the "Ozon Pickup Point" app, complains in his article
+"Is Swift OpenAPI Generator ready for production code?" about the inability to influence the generation
+process and about very long dependency builds — an empty project took him around 105 seconds on a
+MacBook Pro M1. The tool has matured noticeably since, but the fact itself is telling: choose a
+generator soberly and check the result against your real contract rather than against a textbook example
+with kittens.
 
-**Дисциплина поддержки.** Контракт работает ровно настолько, насколько команда дисциплинирована. Если процесс позволяет менять код в обход спецификации, вы получите худшее из двух миров: и контракт, и реальность, и оба врут. В русскоязычных кейсах это описывают прямо: бывает, что аналитик нарисовал схему, разработчик по ходу дела поменял её «в коде», тестировщики завели полсотни дефектов по схеме аналитика — и выяснилось, что единого источника правды на самом деле нет. Формальное внедрение контракта без дисциплины проблему не решает, а маскирует.
+**The discipline to maintain it.** A contract works exactly as well as the team is disciplined. If the
+process allows changing code around the specification, you get the worst of both worlds: a contract and
+a reality, both lying. Russian-language case studies describe this bluntly: an analyst draws a schema, a
+developer changes it "in the code" along the way, testers file fifty defects against the analyst's
+schema — and it turns out there is no single source of truth after all. Formally adopting a contract
+without discipline does not solve the problem, it masks it.
 
-**Подход требует ролей и времени.** Та же команда МТС честно отмечает: spec-first хорошо работает там, где есть аналитики и архитекторы, ответственные за спецификации, либо у разработчиков выделено время на их написание. Это не бесплатно. И это подводит нас к главному возражению.
+**The approach requires roles and time.** The same MTS team notes honestly: spec-first works well where
+there are analysts and architects responsible for specifications, or where developers have time
+allocated for writing them. This is not free. And that brings us to the main objection.
 
-## «Это же лишняя работа для бэкенда» — честный разбор
+## "That's extra work for the backend" — an honest look
 
-Самое частое возражение, которое я слышу: «Тебе, клиентскому разработчику, хорошо — а нам, бэкендерам, теперь писать ещё и YAML-спецификации руками. Это лишняя работа».
+The most frequent objection I hear: "It's fine for you, a client developer — but now we, the backend
+team, have to write YAML specifications by hand as well. That's extra work."
 
-Давайте разберём это возражение честно, не отмахиваясь. В нём есть две части, и их важно различать.
+Let us take the objection seriously rather than wave it away. It has two parts, and distinguishing them
+matters.
 
-**Первая часть — реальная.** Да, у spec-first есть настоящая первоначальная стоимость. Кто-то должен сесть и написать контракт до начала кодирования. На новый сервис это часы, иногда дни работы пары человек. Для команды без выделенных аналитиков это означает, что нагрузка ложится на разработчиков. Это честная цена, и притворяться, что её нет, — нечестно. Более того, при code-first спецификация формально «бесплатна» (генерируется из аннотаций), и для прототипов, MVP и API, единственный потребитель которого — вы сами, code-first действительно может быть разумнее. Я не утверждаю, что spec-first нужен всем и всегда.
+**The first part is real.** Yes, spec-first has a genuine up-front cost. Somebody has to sit down and
+write the contract before coding starts. For a new service that is hours, sometimes days, of work for a
+couple of people. For a team without dedicated analysts it means the load falls on developers. That is
+an honest price, and pretending it does not exist would be dishonest. What is more, under code-first the
+specification is formally "free" (generated from annotations), and for prototypes, MVPs and APIs whose
+only consumer is you, code-first may genuinely be the more sensible choice. I am not claiming spec-first
+is for everyone always.
 
-**Вторая часть — это сопротивление новому, замаскированное под аргумент о трудозатратах.** И вот здесь стоит быть аккуратным. «Лишняя работа» в формулировке возражения часто означает не «суммарно больше работы», а «новая для меня работа, которой я раньше не делал и которую неохота осваивать». Это нормальная человеческая реакция — «привычка штука сильная», как метко сказано в одном из habr-кейсов. Но это не аргумент о трудозатратах, это аргумент о зоне комфорта, и его стоит называть своим именем.
+**The second part is resistance to novelty, disguised as an argument about effort.** And here it pays to
+be careful. "Extra work" in that objection often means not "more work in total" but "work that is new to
+me, that I have not done before and do not fancy learning". That is a normal human reaction — habit is a
+strong thing, as one Habr case study neatly puts it. But it is not an argument about effort, it is an
+argument about comfort zones, and it deserves to be called by its name.
 
-Потому что если честно посчитать полную стоимость, картина меняется. Та работа, которая «исчезает» при code-first, на самом деле не исчезает — она размазывается и перекладывается на других и на потом. Матвей Лихота из МТС приводит конкретную цифру: на поддержание актуальности swagger-документации в десятке микросервисов у команды уходило «до 20% времени», а после перехода на Documentation-Driven Development «высвободилось около 20% времени разработчиков». Это не «лишняя работа бэкенда» — это уже понесённые потери, просто невидимые, потому что они размазаны по интеграционным багам, по переписке в чатах, по «дёрни endpoint вживую», по сломанным у пользователей клиентам после необъявленного breaking change.
+Because if you count the full cost honestly, the picture changes. The work that "disappears" under
+code-first does not actually disappear — it is smeared out and shifted onto other people and onto later.
+Matvey Likhota of MTS gives a concrete figure: keeping Swagger documentation current across a dozen
+microservices consumed up to 20% of the team's time, and after moving to Documentation-Driven
+Development roughly 20% of developer time was freed up. That is not "extra work for the backend" — that
+is a loss already being incurred, merely invisible, because it is spread across integration bugs, chat
+threads, "just call the endpoint live", and clients broken for users after an unannounced breaking
+change.
 
-Если перенести затраты в начало — написать контракт один раз и строго, — то дальше выгоду получают все: ошибки ловятся на ревью YAML за минуты, а не за день до релиза; клиентские команды стартуют параллельно на моках; breaking changes отлавливаются автоматически; документация перестаёт врать. То есть честный ответ на возражение звучит так: **да, это реальная первоначальная стоимость для бэкенда, и её надо честно заложить в план; но значительная часть этой «новой работы» — это не дополнительные затраты, а перенесённые в начало и сделанные явными те затраты, которые команда и так несёт, только позже, дороже и чужими руками.**
+Move the cost to the front — write the contract once and strictly — and everyone gains afterwards:
+mistakes are caught in a YAML review in minutes rather than the day before release; client teams start
+in parallel against mocks; breaking changes are caught automatically; documentation stops lying. So the
+honest answer to the objection is: **yes, there is a real up-front cost for the backend and it must be
+planned for honestly; but a significant part of this "new work" is not additional effort — it is the
+effort the team already spends, moved to the front and made visible, instead of being spent later, more
+expensively, and by somebody else.**
 
-И ещё одна деталь, которая снимает напряжение: контракт не обязан писать в одиночку бэкендер. Его черновик отлично пишут аналитики и тестировщики, а клиентские разработчики наконец-то получают возможность влиять на API на этапе проектирования — приносить не JSON-файл «хочу вот так», а pull request к спецификации. Это разворачивает обычную динамику, где «бэкенд может поменять API в любой момент, а клиент обязан подстроиться», в сторону совместно согласованного контракта.
+And one more detail that takes the tension out: the contract does not have to be written by a backend
+developer alone. Analysts and testers write excellent drafts, and client developers finally get to
+influence the API at design time — bringing not a JSON file saying "I want it like this" but a pull
+request against the specification. That inverts the usual dynamic where the backend can change the API
+at any moment and the client is obliged to adapt, moving it toward a jointly agreed contract.
 
-## Как внедрять без риска: поэтапный план
+## How to adopt without risk: a staged plan
 
-Резко переходить на полный Contract-First всей компанией — плохая идея. Подход требует дисциплины, а дисциплина не вводится приказом. Гораздо надёжнее двигаться маленькими шагами, на каждом из которых вы получаете пользу, даже если остановитесь.
+Switching the whole company to full Contract-First at once is a bad idea. The approach requires
+discipline, and discipline is not introduced by decree. It is far safer to move in small steps, each of
+which pays off even if you stop there.
 
-1. **Начните с одного сервиса или даже одного домена.** Сделайте его эталонным. Не пытайтесь описать сразу всё — это путь к выгоранию и брошенной затее.
-2. **Если API уже есть — не пишите контракт с нуля.** Сгенерируйте черновик из реального трафика или из существующих Postman-коллекций, а потом доведите его руками.
-3. **Договоритесь о конвенциях и включите линтер.** Прежде чем масштабировать, опишите, как у вас выглядит «хорошее» API, и закрепите это правилами Spectral в CI. Иначе каждый сервис будет в своём стиле.
-4. **Подключите моки и контрактные тесты до кодогенерации.** Это самые быстрые победы с наименьшим риском: клиентские команды начинают работать параллельно, а дрейф отлавливается автоматически. Кодогенерацию можно отложить.
-5. **Поставьте в CI проверку breaking changes.** oasdiff на pull request к спецификации — дёшево внедрить, дорого недооценить.
-6. **И только потом — кодогенерация**, там где она оправдана, и обязательно с проверкой результата на вашем реальном контракте, а не на учебном примере.
+1. **Start with one service, or even one domain.** Make it the reference. Do not try to describe
+   everything at once — that is the road to burnout and an abandoned initiative.
+2. **If the API already exists, do not write the contract from scratch.** Generate a draft from real
+   traffic or from existing Postman collections, then finish it by hand.
+3. **Agree on conventions and turn on a linter.** Before scaling, describe what "good" looks like for
+   your APIs and fix it as Spectral rules in CI. Otherwise every service will have its own style.
+4. **Wire up mocks and contract tests before code generation.** These are the fastest wins with the
+   least risk: client teams start working in parallel and drift is caught automatically. Code generation
+   can wait.
+5. **Put a breaking-change check in CI.** oasdiff on a pull request against the specification is cheap
+   to adopt and expensive to underestimate.
+6. **And only then code generation**, where it is justified, and always verified against your real
+   contract rather than a textbook example.
 
-Что должно остановить вас и заставить пересмотреть план: если спецификацию начинают править в обход (код разошёлся с контрактом и это никого не беспокоит) — значит, дисциплины нет, и прежде чем идти дальше, нужно чинить процесс, а не добавлять инструменты. Контракт без дисциплины — это просто ещё один врущий источник правды.
+What should stop you and make you revisit the plan: if the specification starts being edited around the
+process — the code has diverged from the contract and nobody is bothered — then there is no discipline,
+and the process needs fixing before more tools are added. A contract without discipline is just one more
+lying source of truth.
 
-## Вывод
+## Conclusion
 
-OpenAPI — это не про то, чтобы «не писать код руками». Это про то, чтобы у команды был один источник правды о том, как устроен API, и чтобы этот источник был машиночитаемым, а значит — проверяемым, тестируемым и неспособным незаметно разойтись с реальностью. Кодогенерация — приятный бонус со своей ценой; настоящая выгода — в линтинге, моках, контрактных тестах, честной документации и автоматической ловле breaking changes.
+OpenAPI is not about "not writing code by hand". It is about a team having one source of truth about how
+the API is built, and about that source being machine-readable — and therefore checkable, testable, and
+incapable of silently diverging from reality. Code generation is a pleasant bonus with its own cost; the
+real benefit is in linting, mocks, contract tests, honest documentation and automatic detection of
+breaking changes.
 
-У подхода есть честная цена и реальные слабые места: полиморфизм неудобен, сгенерированный код не всегда красив, а весь подход держится на дисциплине команды. Возражение «это лишняя работа для бэкенда» наполовину справедливо — первоначальная стоимость действительно есть, и её надо закладывать; но вторая половина этой «работы» — это не новые затраты, а старые, перенесённые в начало и сделанные видимыми.
+The approach has an honest price and real weak spots: polymorphism is awkward, generated code is not
+always pretty, and the whole thing rests on team discipline. The objection "this is extra work for the
+backend" is half fair — the up-front cost is real and must be budgeted for; but the other half of that
+"work" is not new effort, it is old effort moved to the front and made visible.
 
-На мой взгляд, для команды, где у API больше одного потребителя — а у мобильных продуктов их всегда минимум два, iOS и Android, — этот размен почти всегда выгоден. Вики врёт, прод молчит, а контракт, если относиться к нему серьёзно, говорит правду. Стоит дать ему такую возможность.
+To my mind, for a team whose API has more than one consumer — and mobile products always have at least
+two, iOS and Android — this trade is almost always worth making. The wiki lies, prod is silent, and a
+contract, if taken seriously, tells the truth. It is worth giving it the chance.

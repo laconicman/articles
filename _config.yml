@@ -13,7 +13,7 @@ theme: minima
 # For GitHub Project Pages: https://username.github.io/repo-name
 # baseurl will be your repository name
 baseurl: "/articles"  # Change this to your repo name
-url: ""  # Leave empty for GitHub Pages to auto-detect
+url: "https://laconicman.github.io"  # needed for absolute cross-language links (see below)
 
 # Build Settings
 markdown: kramdown

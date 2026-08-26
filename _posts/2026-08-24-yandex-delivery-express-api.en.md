@@ -7,7 +7,7 @@ lang: en
 permalink: /2026/08/24/yandex-delivery-express-api/
 ---
 
-*[Читать по-русски →]({{ '/2026/08/24/yandex-delivery-express-api/' | relative_url }})*
+*<a {% static_href %}href="{{ site.baseurl }}/2026/08/24/yandex-delivery-express-api/"{% endstatic_href %}>Читать по-русски →</a>*
 
 ---
 
@@ -31,7 +31,7 @@ Let me be clear about one thing up front: nobody forced me to generate a client 
 could have handed the documentation to a language model and got a pile of `URLSession` or Alamofire
 code out of it, and it would have worked. I wanted to do it properly — no hand-rolled wheels, types
 that catch mistakes at compile time, and no networking layer to maintain by hand afterwards. That is
-the approach I argued for at length in [an earlier article]({{ '/en/2025/06/03/openapi-source-of-truth/' | relative_url }}).
+the approach I argued for at length in [an earlier article]({{ site.baseurl }}/en/2025/06/03/openapi-source-of-truth/).
 
 And this is where the story starts. The reference on the site looks **exactly like documentation
 built from an OpenAPI document**: typed properties, regular expressions, enumerations, per-operation
