@@ -3,6 +3,10 @@ name: Build and Deploy Jekyll Site
 on:
   push:
     branches: [main]
+  # Pull requests build but do not deploy, so a change to the build itself is checked
+  # before it reaches main rather than after.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -25,11 +29,24 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
 
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
+      # Built with bundler rather than actions/jekyll-build-pages: that action runs
+      # Jekyll in safe mode against the GitHub Pages plugin allowlist, and
+      # jekyll-polyglot is not on it — so the plugin never loaded and the site was
+      # multilingual in configuration only.
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
         with:
-          source: .
-          destination: ./_site
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Build with Jekyll
+        run: bundle exec jekyll build --destination ./_site
+        env:
+          JEKYLL_ENV: production
+          # index.md reads site.github.repository_url, which jekyll-github-metadata
+          # resolves from this variable. actions/jekyll-build-pages set it for us;
+          # a plain bundle exec build does not.
+          PAGES_REPO_NWO: ${{ github.repository }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -37,6 +54,7 @@ jobs:
           path: _site/
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
