@@ -349,6 +349,60 @@ merging the query, which is a library call in any language.
 POST request, where a status notification belongs, rather than in a query string that ends up in access
 logs.
 
+## Accepted is not honoured
+
+September 2026 added a second day of live calls — the two operations that appear in the
+documentation index though the changelog never noticed them: `claims/journal`, an account-wide
+feed of status and price events, and `claims/search`, a paginated lookup. Both exist and both
+work, and probing their edges produced a behaviour the first day had missed: **the server
+silently ignores request fields and parameters it does not know.**
+
+- `claims/journal`'s body is a single field — an opaque cursor. Sending
+  `{"claim_id": "00000000…"}` instead returned the same events as the unfiltered call.
+  `claim_id` is a real filter — on `claims/search`, one page over in the same reference. On
+  journal it does not error and does not filter; it is dropped.
+- `claims/journal?cursor=…` — the cursor as a *query* parameter rather than in the body —
+  returned `200` with the *first* page of the feed, not the continuation. Ignored the same way.
+
+This is worse than a 400. A caller who believes they filtered receives plausible, wrong data
+with no signal — and on a change feed, "the same events again" looks exactly like success. What
+the endpoint does know, it enforces precisely: `limit=1001` answers
+`400 "must be 1000 (limit) >= 1001 (value)"`, so the validation exists — it simply does not
+extend to input the schema never heard of. (`claims/search` holds its own boundary honourably:
+`{"limit": 0}` is legal and answers `{"claims":[]}` with no cursor key at all.)
+
+**What suggests itself.** Reject what you do not understand — `additionalProperties: false` on
+request bodies, an allowlist for query parameters. An integrator's "the request was accepted"
+should mean the request was read.
+
+## The specification is in there — it leaks through the errors
+
+`claims/search` takes a body that is one of two shapes: a filter, or a continuation cursor from
+the previous page. The reference documents this in prose. The server documents it better — a
+body matching neither shape earns:
+
+```json
+{"code":"400","message":"Value of '/' cannot be parsed as a variant"}
+```
+
+Not "bad request": *variant*. The decoder knows the body is a `oneOf` and reports the union
+failing to resolve — a typed schema inside the service, visible only through the error channel.
+The cursors tell the same story from the other side: the journal's is a signed JWT carrying
+`{version, last_known_id, holes}`, the search's is base64-encoded JSON of the filter state.
+Opaque to the caller, engineered all the same — the machine-readable contract exists; it is
+simply not shared.
+
+The same day settled smaller questions the reference leaves open. Its `claims/cancel` example
+returns `"status": "new"` on a cancelled claim; the wire returns `"status": "cancelled"` — the
+example is stale, and only a live cancel could say so. The journal's terminal event for a
+*user-initiated* cancel carries `resolution: "failed"` — `success` means *delivered*, not "your
+request worked". And `claims/create` answers fields — `route_points[].uuid`,
+`available_cancel_state`, `features` — that `claims/info` and `claims/search` never repeat:
+the same claim is a different object depending on which operation you asked, a fact no page
+states.
+
+**What suggests itself.** Nothing new — publish the document. It demonstrably exists.
+
 ## Access, tokens, and the sandbox that is not one
 
 Credentials come through the dashboard: a manager issues a login and password, then there is a button
@@ -486,6 +540,9 @@ violated by a live API from a major company.
 8. **Say what an advisory method does not guarantee** — conditions and validity, or make it a dry run.
 9. **Write cross-field constraints in prose**, since the schema cannot hold them.
 10. **Provide a sandbox** whose differences from production are documented and minimal.
+11. **Reject input you do not understand.** A silently dropped field reads as success to the
+   caller — `additionalProperties: false` on bodies and an allowlist on query parameters turn
+   a plausible wrong answer into an honest 400.
 
 ## Bottom line
 
