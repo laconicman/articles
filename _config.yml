@@ -13,7 +13,7 @@ theme: minima
 # For GitHub Project Pages: https://username.github.io/repo-name
 # baseurl will be your repository name
 baseurl: "/articles"  # Change this to your repo name
-url: ""  # Leave empty for GitHub Pages to auto-detect
+url: "https://laconicman.github.io"  # needed for absolute cross-language links (see below)
 
 # Build Settings
 markdown: kramdown
@@ -33,6 +33,7 @@ plugins:
   - jekyll-sitemap
   - jekyll-seo-tag
   - jekyll-polyglot
+  - jekyll-redirect-from
 
 # Default Front Matter
 defaults:
@@ -61,6 +62,7 @@ exclude:
   - vendor/ruby/
   - README.md
   - LICENSE
+  - notes/          # research notes, kept with the repo but never published
 
 # Minima Theme Customizations
 minima:
